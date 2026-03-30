@@ -44,7 +44,7 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
     phone = db.Column(db.String(15), unique=True, nullable=True)
-    
+
     # 'Role' is no longer a string; it will now link directly to the 'Role' table.
     role_id = db.Column(db.Integer, db.ForeignKey('role.id'), nullable=False) 
     

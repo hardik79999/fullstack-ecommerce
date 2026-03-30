@@ -3,6 +3,7 @@ from shop.extensions import db, bcrypt
 from shop.models import User
 from flask_jwt_extended import create_access_token
 from datetime import timedelta
+from shop.models import User, Role
 
 #email
 from shop.utils.email_service import send_verification_email, verify_token
@@ -27,7 +28,17 @@ def signup():
 
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
 
-    new_user = User(username=username, email=email, password=hashed_password, phone=phone)
+    default_role = Role.query.filter_by(role_name='user').first()
+    
+    if not default_role:
+        return jsonify({"error": "System roles not initialized"}), 500
+
+    new_user = User(username=username,
+                    email=email,
+                    password=hashed_password,
+                    phone=phone,
+                    role_id=default_role.id
+                )
     db.session.add(new_user)
     db.session.commit()
 
@@ -70,7 +81,7 @@ def login():
     
     access_token = create_access_token(
         identity=str(user.public_id), 
-        additional_claims={"role": user.role},
+        additional_claims={"role": user.role.role_naem},
         expires_delta=timedelta(days=1)
     )
 
@@ -82,7 +93,7 @@ def login():
             "public_id": user.public_id,
             "username": user.username,
             "email": user.email,
-            "role": user.role
+            "role": user.role.role_name
         }
     }), 200
 
@@ -95,7 +106,7 @@ def login():
 
 @auth_bp.route('/verify-email/<token>', methods=['GET'])
 def verify_email(token):
-    
+
     email = verify_token(token)
     
     if not email:

@@ -23,7 +23,7 @@ def get_profile():
             "username": user.username,
             "email": user.email,
             "phone": user.phone,
-            "role": user.role,
+            "role": user.role.role_name,
             "is_active": user.is_active,
             "is_verified": user.is_verified
         }
