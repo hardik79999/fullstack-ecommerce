@@ -10,3 +10,10 @@ class Config:
     
     # Naya add kiya hai: JWT ke liye secret key
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'hardik_jwt_super_secret_key'
+
+    MAIL_SERVER = os.environ.get('MAIL_SERVER')
+    MAIL_PORT = int(os.environ.get('MAIL_PORT') or 587)
+    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS') == 'True'
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_USERNAME')

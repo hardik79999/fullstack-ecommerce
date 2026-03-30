@@ -1,17 +1,27 @@
 from flask import Flask
 from config import Config
-from shop.extensions import db, migrate  # <-- Yahan se utils hata diya
+from shop.extensions import db, migrate, bcrypt, jwt, mail
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     
     app.config.from_object(config_class)
 
+    # extensions initialize
     db.init_app(app)
     migrate.init_app(app, db)
+    bcrypt.init_app(app)
+    jwt.init_app(app)
+    mail.init_app(app)
 
-    # Models ko yahan import karna zaroori hai
-    from shop import models  # <-- Yahan se bhi utils hata diya
+    from shop import models
+
+    # Blueprints Register
+    from shop.auth.routes import auth_bp
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+
+    from shop.user.routes import user_bp
+    app.register_blueprint(user_bp, url_prefix='/api/user')
 
     @app.route('/')
     def index():
