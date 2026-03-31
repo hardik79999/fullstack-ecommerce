@@ -28,7 +28,7 @@ def signup():
 
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
 
-    default_role = Role.query.filter_by(role_name='user').first()
+    default_role = Role.query.filter_by(role_name='customer').first()
     
     if not default_role:
         return jsonify({"error": "System roles not initialized"}), 500
@@ -80,7 +80,7 @@ def login():
 
     
     access_token = create_access_token(
-        identity=str(user.public_id), 
+        identity=str(user.uuid), 
         additional_claims={"role": user.role.role_name},
         expires_delta=timedelta(days=1)
     )
@@ -90,7 +90,7 @@ def login():
         "message": "Login successful!",
         "access_token": access_token,
         "user": {
-            "public_id": user.public_id,
+            "uuid": user.uuid,
             "username": user.username,
             "email": user.email,
             "role": user.role.role_name

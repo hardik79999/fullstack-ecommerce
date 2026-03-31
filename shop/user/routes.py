@@ -8,10 +8,10 @@ user_bp = Blueprint('user', __name__)
 @jwt_required()
 def get_profile():
 
-    public_id = get_jwt_identity()
+    uuid = get_jwt_identity()
 
     
-    user = User.query.filter_by(public_id=public_id).first()
+    user = User.query.filter_by(uuid=uuid).first()
 
     if not user:
         return jsonify({"error": "User not found"}), 404
@@ -19,7 +19,7 @@ def get_profile():
     return jsonify({
         "message": "Welcome to your protected profile!",
         "user_data": {
-            "public_id": user.public_id,
+            "uuid": user.uuid,
             "username": user.username,
             "email": user.email,
             "phone": user.phone,

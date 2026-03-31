@@ -17,3 +17,11 @@ class Config:
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_USERNAME')
+
+
+
+    # 📁 File Upload Settings
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'shop', 'static', 'uploads', 'products')
+    MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # Max 5MB file allowed
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}

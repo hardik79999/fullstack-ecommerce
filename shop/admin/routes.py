@@ -3,7 +3,7 @@ from shop.models import Category, User
 from shop.extensions import db
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
-admin_bp = Blueprint('admin_bd',__name__)
+admin_bp = Blueprint('admin_bp',__name__)
 
 # ==============================================================================
 # 🛡️ HELPER DECORATOR: Check if user is Admin
@@ -43,12 +43,16 @@ def create_category():
     existing_category = Category.query.filter_by(name=name).first()
     if existing_category:
         return jsonify({"error": f"Category '{name}' already exists"}), 409
+    
+    current_user_uuid = get_jwt_identity()
+    admin_user = User.query.filter_by(uuid=current_user_uuid).first()
         
     # 3. Create new Category
     try:
         new_category = Category(
             name=name,
-            description=description
+            description=description,
+            created_by=admin_user.id 
             # is_active default True hai models me
         )
         db.session.add(new_category)
@@ -72,7 +76,7 @@ def create_category():
 
 @admin_bp.route('/categories', methods=['GET'])
 def get_all_categories():
-    # Ye public endpoint ho sakta hai, taaki users/sellers categories dekh sakein
+    
     categories = Category.query.filter_by(is_active=True).all()
     
     result = []

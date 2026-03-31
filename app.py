@@ -25,6 +25,9 @@ def create_app(config_class=Config):
 
     from shop.admin.routes import admin_bp
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    
+    from shop.seller.routes import seller_bp
+    app.register_blueprint(seller_bp, url_prefix='/api/seller')
 
     @app.route('/')
     def index():

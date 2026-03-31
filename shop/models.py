@@ -139,6 +139,7 @@ class SellerCategory(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class Product(db.Model):
+    __tablename__ = 'product'
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     
@@ -152,6 +153,10 @@ class Product(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     seller_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     
+    # Audit Trail: Kisne create/update kiya
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    updated_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True) # Optional on creation
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -160,6 +165,7 @@ class Product(db.Model):
     reviews = db.relationship('Review', backref='product', lazy=True)
 
 class ProductImage(db.Model):
+    __tablename__ = 'product_image'
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     
@@ -167,15 +173,23 @@ class ProductImage(db.Model):
     image_url = db.Column(db.String(255), nullable=False)
     is_primary = db.Column(db.Boolean, default=False)
     
+    # Audit Trail: Kis seller ne ye image dali
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Specification(db.Model):
+    __tablename__ = 'specification'
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     spec_key = db.Column(db.String(100), nullable=False)   
     spec_value = db.Column(db.String(255), nullable=False) 
+    
+    # Audit Trail
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    updated_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
