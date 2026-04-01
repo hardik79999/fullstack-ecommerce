@@ -195,7 +195,8 @@ def get_my_products(current_seller):
 #==============================================================================================================================
 #==============================================================================================================================
 
-from shop.models import SellerCategory, Category
+from shop.models import SellerCategory, Category, Role
+from shop.utils.email_service import send_category_request_email_to_admin
 
 from shop.models import SellerCategory, Category
 
@@ -212,7 +213,6 @@ def request_category_approval(current_seller):
     if not category:
         return jsonify({"error": "Category not found or inactive"}), 404
         
-    # Check agar pehle se request daali hui hai
     existing_request = SellerCategory.query.filter_by(
         seller_id=current_seller.id, 
         category_id=category.id
@@ -223,7 +223,6 @@ def request_category_approval(current_seller):
         return jsonify({"message": f"You already have a {status} request for this category."}), 400
         
     try:
-        # Nayi request create karo (is_approved ko explicitly False set karenge taaki admin approve kare)
         new_request = SellerCategory(
             seller_id=current_seller.id,
             category_id=category.id,
@@ -235,30 +234,36 @@ def request_category_approval(current_seller):
         db.session.add(new_request)
         db.session.commit()
         
+        # =====================================================================
+        # 📧 EMAIL TO ADMIN LOGIC
+        # =====================================================================
+        try:
+            # 1. Pehle Admin role ki ID nikalo
+            admin_role = Role.query.filter_by(role_name='admin').first()
+            
+            # 2. Saare active admins nikal lo (kya pata system me 2-3 admin hon)
+            active_admins = User.query.filter_by(role_id=admin_role.id, is_active=True).all()
+            
+            if active_admins:
+                admin_emails = [admin.email for admin in active_admins]
+                
+                # 3. Mail bhej do
+                send_category_request_email_to_admin(
+                    admin_emails=admin_emails,
+                    seller_name=current_seller.username,
+                    category_name=category.name
+                )
+                print(f"Notification sent to admins: {admin_emails}")
+        except Exception as mail_err:
+            print(f"Admin email sending failed: {str(mail_err)}")
+            # Agar mail fail bhi ho jaye, toh request cancel nahi honi chahiye
+        # =====================================================================
+        
         return jsonify({
-            "message": f"Request to sell in '{category.name}' submitted successfully. Waiting for Admin approval.",
+            "message": f"Request to sell in '{category.name}' submitted successfully. An email notification has been sent to the Admin.",
             "request_uuid": new_request.uuid
         }), 201
         
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "Failed to submit request", "details": str(e)}), 500
-
-
-# Seller apni saari approved aur pending categories dekh sake
-@seller_bp.route('/my-categories', methods=['GET'])
-@seller_required
-def get_my_categories(current_seller):
-    seller_categories = SellerCategory.query.filter_by(seller_id=current_seller.id, is_active=True).all()
-    
-    result = []
-    for sc in seller_categories:
-        result.append({
-            "request_uuid": sc.uuid,
-            "category_name": sc.category.name, # Relationship ki wajah se aayega
-            "category_uuid": sc.category.uuid,
-            "is_approved": sc.is_approved,
-            "requested_at": sc.created_at.strftime("%Y-%m-%d")
-        })
-        
-    return jsonify({"total": len(result), "categories": result}), 200

@@ -43,3 +43,36 @@ def send_verification_email(user_email):
     )
     
     mail.send(msg)
+
+
+
+
+
+
+
+
+
+
+# shop/utils/email_service.py ke aakhir mein ye add karo:
+
+def send_category_request_email_to_admin(admin_emails, seller_name, category_name):
+    """Admin ko notification bhejne ke liye function"""
+    html_body = f"""
+    <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="color: #FF5722;">🚨 New Category Approval Request</h2>
+        <p>Hello Admin,</p>
+        <p>Seller <strong>{seller_name}</strong> has requested permission to sell products in the <strong>{category_name}</strong> category.</p>
+        <p>Please log in to your Admin Dashboard to Review, Approve, or Reject this request.</p>
+        <br>
+        <p>Regards,<br>E-Commerce Pro System</p>
+    </div>
+    """
+    
+    msg = Message(
+        subject=f"Action Required: Category Request from {seller_name}",
+        recipients=admin_emails, # Ek se zyada admin ho toh sabko jayega
+        html=html_body,
+        sender=current_app.config['MAIL_DEFAULT_SENDER']
+    )
+    
+    mail.send(msg)
