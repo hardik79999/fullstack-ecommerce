@@ -67,7 +67,7 @@ class User(db.Model):
     addresses = db.relationship('Address', backref='user', lazy=True)
     otps = db.relationship('Otp', backref='user', lazy=True)
     orders = db.relationship('Order', backref='customer', lazy=True)
-    products = db.relationship('Product', backref='seller', lazy=True)
+    products = db.relationship('Product', foreign_keys='Product.seller_id', backref='seller_user', lazy=True)
     created_categories = db.relationship('Category', backref='creator', lazy=True)
 
 class Otp(db.Model):
@@ -91,7 +91,7 @@ class Address(db.Model):
     
     full_name = db.Column(db.String(100), nullable=False)
     phone_number = db.Column(db.String(15), nullable=False)
-    street_address = db.Column(db.String(255), nullable=False)
+    street = db.Column(db.String(255), nullable=False)
     city = db.Column(db.String(100), nullable=False)
     state = db.Column(db.String(100), nullable=False)
     pincode = db.Column(db.String(20), nullable=False)

@@ -39,9 +39,6 @@ def allowed_file(filename):
 @seller_bp.route('/product', methods=['POST'])
 @seller_required
 def create_product(current_seller):
-    # DHYAN DE: Ab hum request.get_json() use NAHI kar rahe.
-    # Hum form-data use kar rahe hain (request.form aur request.files)
-    
     name = request.form.get('name')
     description = request.form.get('description')
     price = request.form.get('price')
@@ -57,60 +54,70 @@ def create_product(current_seller):
     if not category:
         return jsonify({"error": "Invalid or inactive category"}), 404
 
-    # 3. Handle File Upload (Optional: agar image di hai toh)
-    image_file = request.files.get('image') # 'image' key se file aayegi Postman se
-    image_url = None
+    # 3. Handle MULTIPLE File Uploads
+    # Dhyan de: getlist('images') use kar rahe hain, jiska matlab Postman me key ka naam 'images' hoga
+    image_files = request.files.getlist('images')
+    saved_image_urls = []
 
-    if image_file:
-        if image_file.filename == '':
-            return jsonify({"error": "No selected file"}), 400
+    # Agar koi image nahi aayi toh blank list rah jayegi, lekin agar aayi hai toh process karo
+    if image_files and image_files[0].filename != '':
+        upload_dir = current_app.config['UPLOAD_FOLDER']
+        
+        # Ensure directory exists
+        if not os.path.exists(upload_dir):
+            os.makedirs(upload_dir)
             
-        if image_file and allowed_file(image_file.filename):
-            # Safe filename banana aur unique naam dena
-            original_filename = secure_filename(image_file.filename)
-            unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
-            
-            # Save file to folder
-            upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
-            image_file.save(upload_path)
-            
-            # DB me save karne ke liye relative path (taaki frontend access kar sake)
-            image_url = f"/static/uploads/products/{unique_filename}"
-        else:
-            return jsonify({"error": "Invalid file type. Allowed: jpg, jpeg, png, webp"}), 400
+        for file in image_files:
+            if file and allowed_file(file.filename):
+                original_filename = secure_filename(file.filename)
+                unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
+                upload_path = os.path.join(upload_dir, unique_filename)
+                file.save(upload_path)
+                
+                # Append relative URL to our list
+                saved_image_urls.append(f"/static/uploads/products/{unique_filename}")
+            else:
+                return jsonify({"error": f"Invalid file type for '{file.filename}'. Allowed: jpg, jpeg, png, webp"}), 400
 
-    # 4. Create Product & DB Transaction
+    # 4. Create Product & Images in DB Transaction
     try:
-        # Step A: Create Product
+        # Step A: Create Product (Ab created_by aur updated_by ke sath)
         new_product = Product(
             name=name,
             description=description,
             price=float(price),
             stock=int(stock),
             category_id=category.id,
-            seller_id=current_seller.id
+            seller_id=current_seller.id,
+            created_by=current_seller.id, # Audit field
+            updated_by=current_seller.id  # Audit field
         )
         db.session.add(new_product)
-        db.session.flush() # Flush se new_product ko 'id' mil jayegi bina commit kiye
+        db.session.flush() # Flush to get new_product.id
         
-        # Step B: Create Product Image (Agar upload hui hai toh)
-        if image_url:
+        # Step B: Create Product Images
+        for index, url in enumerate(saved_image_urls):
+            # Pehli image ko primary bana denge (index 0)
+            is_primary = True if index == 0 else False
+            
             new_image = ProductImage(
                 product_id=new_product.id,
-                image_url=image_url,
-                is_primary=True  # Pehli image ko primary bana diya
+                image_url=url,
+                is_primary=is_primary,
+                created_by=current_seller.id # Audit field
             )
             db.session.add(new_image)
             
         db.session.commit()
         
         return jsonify({
-            "message": "Product created successfully",
+            "message": "Product created successfully with images",
             "product": {
                 "uuid": new_product.uuid,
                 "name": new_product.name,
                 "price": new_product.price,
-                "image_url": image_url # Response me URL dikha rahe hain
+                "created_by": new_product.created_by,  # 👈 Ye add kar diya humne
+                "images": saved_image_urls
             }
         }), 201
         
@@ -118,6 +125,8 @@ def create_product(current_seller):
         db.session.rollback()
         return jsonify({"error": "Failed to create product", "details": str(e)}), 500
 
+#==================================================================================================================================
+#==================================================================================================================================
 
 @seller_bp.route('/products', methods=['GET'])
 @seller_required
