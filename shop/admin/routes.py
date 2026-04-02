@@ -53,7 +53,7 @@ def create_category():
             name=name,
             description=description,
             created_by=admin_user.id 
-            # is_active default True hai models me
+            
         )
         db.session.add(new_category)
         db.session.commit()
@@ -110,7 +110,7 @@ def get_all_sellers():
             "username": seller.username,
             "email": seller.email,
             "phone": seller.phone,
-            "is_active": seller.is_active,  # Ye dekh kar admin ko pata chalega kon active hai
+            "is_active": seller.is_active,  
             "is_verified": seller.is_verified,
             "joined_at": seller.created_at
         })
@@ -146,40 +146,46 @@ def toggle_seller_status(seller_uuid):
 #=======================================================================================================================
 
 
-from shop.models import Order, OrderTracking, OrderStatus
+from flask_jwt_extended import get_jwt_identity
+from shop.models import User, Order, OrderTracking, OrderStatus
 
 @admin_bp.route('/order/<order_uuid>/status', methods=['PUT'])
 @admin_required
 def update_order_status(order_uuid):
     data = request.get_json()
-    new_status_str = data.get('status') # e.g., 'shipped', 'delivered'
-    message = data.get('message', '')   # e.g., 'Dispatched via BlueDart AWB: 12345'
+    new_status_str = data.get('status') 
+    message = data.get('message', '')   
     
     if not new_status_str:
         return jsonify({"error": "Status is required"}), 400
         
-    # 1. Find Order
     order = Order.query.filter_by(uuid=order_uuid).first()
     if not order:
         return jsonify({"error": "Order not found"}), 404
         
-    # 2. Validate Enum Status
     try:
         new_status = OrderStatus[new_status_str.lower()]
     except KeyError:
         valid_statuses = [e.name for e in OrderStatus]
         return jsonify({"error": f"Invalid status. Must be one of: {valid_statuses}"}), 400
+
+    # ==========================================================
+    # 🛡️ THE FIX: Admin
+    # ==========================================================
+    current_admin_uuid = get_jwt_identity()
+    admin_user = User.query.filter_by(uuid=current_admin_uuid).first()
         
-    # 3. Update Order and Add Tracking Record
     try:
-        # Update main order status
         order.status = new_status
+        order.updated_by = admin_user.id 
         
-        # Add tracking history
         tracking_entry = OrderTracking(
             order_id=order.id,
             status=new_status,
-            message=message
+            message=message,
+            created_by=admin_user.id,  
+            updated_by=admin_user.id,  
+            is_active=True
         )
         db.session.add(tracking_entry)
         db.session.commit()
@@ -209,7 +215,6 @@ def get_all_category_requests():
     
     result = []
     for req in pending_requests:
-        # Note: Model me backrefs set hone chahiye properly
         seller_name = User.query.get(req.seller_id).username
         category_name = Category.query.get(req.category_id).name
         
@@ -226,7 +231,7 @@ def get_all_category_requests():
 @admin_bp.route('/category-request/<request_uuid>/approve', methods=['PUT'])
 @admin_required
 def approve_seller_category(request_uuid):
-    # Request dhundo
+
     category_req = SellerCategory.query.filter_by(uuid=request_uuid).first()
     
     if not category_req:
@@ -236,10 +241,10 @@ def approve_seller_category(request_uuid):
         return jsonify({"message": "This request is already approved."}), 400
         
     try:
-        # Admin ne approve kar diya
+
         category_req.is_approved = True
         
-        # Admin ki ID (optional, agar tum updated_by Admin karna chaho)
+
         current_admin_uuid = get_jwt_identity()
         admin = User.query.filter_by(uuid=current_admin_uuid).first()
         category_req.updated_by = admin.id
