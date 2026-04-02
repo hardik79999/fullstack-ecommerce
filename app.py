@@ -1,9 +1,15 @@
-from flask import Flask
+from flask import Flask , render_template
 from config import Config
-from shop.extensions import db, migrate, bcrypt, jwt, mail
+from shop.extensions import db, migrate, bcrypt, jwt, mail, cors
+import os
 
 def create_app(config_class=Config):
-    app = Flask(__name__)
+    # Configure Flask to serve frontend from frontend/ directory
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    template_dir = os.path.join(basedir, 'frontend', 'templates')
+    static_dir = os.path.join(basedir, 'frontend', 'static')
+    
+    app = Flask(__name__, template_folder=template_dir, static_folder=static_dir, static_url_path='/static')
     
     app.config.from_object(config_class)
 
@@ -13,6 +19,7 @@ def create_app(config_class=Config):
     bcrypt.init_app(app)
     jwt.init_app(app)
     mail.init_app(app)
+    cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
 
     from shop import models
 
@@ -31,7 +38,7 @@ def create_app(config_class=Config):
 
     @app.route('/')
     def index():
-        return {"message": "E-Commerce Backend is Running Successfully!"}, 200
+        return render_template('index.html')
 
     return app
 

@@ -261,3 +261,77 @@ def approve_seller_category(request_uuid):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "Failed to approve request", "details": str(e)}), 500
+
+
+@admin_bp.route('/category-request/<request_uuid>/decline', methods=['PUT'])
+@admin_required
+def decline_seller_category(request_uuid):
+    """Decline/Reject seller's category request"""
+    category_req = SellerCategory.query.filter_by(uuid=request_uuid).first()
+    
+    if not category_req:
+        return jsonify({"error": "Request not found"}), 404
+        
+    if category_req.is_approved:
+        return jsonify({"message": "This request is already approved. Cannot decline."}), 400
+        
+    try:
+        current_admin_uuid = get_jwt_identity()
+        admin = User.query.filter_by(uuid=current_admin_uuid).first()
+        
+        # Soft delete the request
+        category_req.is_active = False
+        category_req.updated_by = admin.id
+        
+        db.session.commit()
+        
+        seller = User.query.get(category_req.seller_id)
+        category = Category.query.get(category_req.category_id)
+        
+        return jsonify({
+            "message": f"Request from '{seller.username}' for '{category.name}' has been declined."
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to decline request", "details": str(e)}), 500
+
+#=================================================================================================================
+# GET ALL ORDERS (Admin Only)
+#=================================================================================================================
+
+@admin_bp.route('/orders', methods=['GET'])
+@admin_required
+def get_all_orders():
+    # Get all orders, ordered by most recent first
+    orders = Order.query.order_by(Order.created_at.desc()).all()
+    
+    result = []
+    for order in orders:
+        customer = User.query.get(order.user_id)
+        
+        order_items = []
+        for item in order.items:
+            order_items.append({
+                "product_name": item.product.name,
+                "product_price": item.product.price,
+                "quantity": item.quantity,
+                "price_at_purchase": item.price_at_purchase
+            })
+        
+        result.append({
+            "order_uuid": order.uuid,
+            "order_id": order.id,
+            "customer_username": customer.username if customer else "Unknown",
+            "customer_email": customer.email if customer else "Unknown",
+            "status": order.status.name,
+            "total_amount": order.total_amount,
+            "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "items": order_items,
+            "item_count": len(order_items)
+        })
+    
+    return jsonify({
+        "total_orders": len(result),
+        "orders": result
+    }), 200

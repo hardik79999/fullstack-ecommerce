@@ -1,9 +1,14 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from shop.models import User
-from shop.extensions import db
+import random
+import string
 
-from shop.models import Product, ProductImage, Category
+from shop.extensions import db
+from shop.models import (
+    User, Product, ProductImage, Category, Specification,
+    CartItem, Address, Order, OrderItem, Payment, Invoice,
+    OrderTracking, OrderStatus, PaymentStatus, PaymentMethod
+)
 
 user_bp = Blueprint('user', __name__)
 
@@ -19,16 +24,29 @@ def get_profile():
     if not user:
         return jsonify({"error": "User not found"}), 404
 
+    # Format addresses
+    addresses = [{
+        "uuid": addr.uuid,
+        "full_name": addr.full_name,
+        "phone_number": addr.phone_number,
+        "street": addr.street,
+        "city": addr.city,
+        "state": addr.state,
+        "pincode": addr.pincode,
+        "is_default": addr.is_default
+    } for addr in user.addresses if addr.is_active]
+
     return jsonify({
         "message": "Welcome to your protected profile!",
-        "user_data": {
+        "user": {
             "uuid": user.uuid,
             "username": user.username,
             "email": user.email,
             "phone": user.phone,
             "role": user.role.role_name,
             "is_active": user.is_active,
-            "is_verified": user.is_verified
+            "is_verified": user.is_verified,
+            "addresses": addresses
         }
     }), 200
 
@@ -52,6 +70,7 @@ def get_public_products():
             "uuid": prod.uuid,
             "name": prod.name,
             "price": prod.price,
+            "stock": prod.stock,
             "category": prod.category.name,
             "seller": prod.seller_user.username, 
             "primary_image": primary_image.image_url if primary_image else None,
@@ -72,6 +91,51 @@ def get_public_products():
 
 from flask import request
 from shop.models import CartItem
+
+
+# ✅ NEW ENDPOINT: Get Single Product Details with ALL Images
+@user_bp.route('/product/<product_uuid>', methods=['GET'])
+def get_product_detail(product_uuid):
+    """
+    Fetch single product with:
+    - All images (primary_image + images array)
+    - All specifications
+    - Seller info
+    """
+    product = Product.query.join(User, Product.seller_id == User.id)\
+        .filter(Product.uuid == product_uuid, Product.is_active == True, User.is_active == True).first()
+    
+    if not product:
+        return jsonify({"error": "Product not found or inactive"}), 404
+    
+    # Get all product images from ProductImage table
+    all_images = ProductImage.query.filter_by(product_id=product.id, is_active=True).all()
+    primary_image = ProductImage.query.filter_by(product_id=product.id, is_primary=True, is_active=True).first()
+    
+    # Build images list
+    images_list = [img.image_url for img in all_images]
+    
+    # Get all specs
+    specs = [{"key": s.spec_key, "value": s.spec_value} for s in product.specifications if s.is_active]
+    
+    return jsonify({
+        "product": {
+            "uuid": product.uuid,
+            "name": product.name,
+            "description": product.description,
+            "price": product.price,
+            "stock": product.stock,
+            "category": product.category.name,
+            "seller": product.seller_user.username,
+            "primary_image": primary_image.image_url if primary_image else None,
+            "images": images_list,
+            "specifications": specs
+        }
+    }), 200
+
+
+#================================================================================================================
+#================================================================================================================
 
 # Helper decorator to ensure the user is a 'customer'
 def customer_required(fn):
@@ -94,6 +158,10 @@ def customer_required(fn):
 @user_bp.route('/cart', methods=['POST'])
 @customer_required
 def add_to_cart(current_customer):
+    # Admin cannot buy products - only view
+    if current_customer.role.role_name == 'admin':
+        return jsonify({"error": "Unauthorized", "message": "Admin users cannot purchase products."}), 403
+    
     data = request.get_json()
     product_uuid = data.get('product_uuid')
     quantity = data.get('quantity', 1)
@@ -178,8 +246,6 @@ def view_cart(current_customer):
 #================================================================================================================
 
 
-from shop.models import Address
-
 @user_bp.route('/address', methods=['POST'])
 @customer_required
 def add_address(current_customer):
@@ -216,11 +282,13 @@ def add_address(current_customer):
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-from shop.models import Order, OrderItem
-
 @user_bp.route('/checkout', methods=['POST'])
 @customer_required
 def checkout(current_customer):
+    # Admin cannot checkout
+    if current_customer.role.role_name == 'admin':
+        return jsonify({"error": "Unauthorized", "message": "Admin users cannot place orders."}), 403
+    
     data = request.get_json()
     address_uuid = data.get('address_uuid')
     
@@ -293,9 +361,6 @@ def checkout(current_customer):
         return jsonify({"error": "Transaction failed", "details": str(e)}), 500
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-import random
-import string
-from shop.models import Payment, Invoice, Order, OrderTracking, OrderStatus, PaymentStatus, PaymentMethod # 👈 PaymentMethod import karna mat bhulna
 
 @user_bp.route('/payment', methods=['POST'])
 @customer_required
@@ -416,8 +481,6 @@ def process_payment(current_customer):
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-from shop.models import Order
-
 @user_bp.route('/order/<order_uuid>/track', methods=['GET'])
 @customer_required
 def track_order(current_customer, order_uuid):
@@ -451,6 +514,41 @@ def track_order(current_customer, order_uuid):
         "current_status": order.status.name,
         "total_amount": order.total_amount,
         "tracking_history": tracking_history
+    }), 200
+
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# GET USER ORDERS
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+@user_bp.route('/orders', methods=['GET'])
+@customer_required
+def get_user_orders(current_customer):
+    # Fetch all orders for the current customer
+    orders = Order.query.filter_by(user_id=current_customer.id).order_by(Order.created_at.desc()).all()
+    
+    result = []
+    for order in orders:
+        order_items = []
+        for item in order.items:
+            order_items.append({
+                "product_name": item.product.name,
+                "quantity": item.quantity,
+                "price_at_purchase": item.price_at_purchase
+            })
+        
+        result.append({
+            "order_uuid": order.uuid,
+            "order_id": order.id,
+            "status": order.status.name,
+            "total_amount": order.total_amount,
+            "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "items": order_items,
+            "item_count": len(order_items)
+        })
+    
+    return jsonify({
+        "total_orders": len(result),
+        "orders": result
     }), 200
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

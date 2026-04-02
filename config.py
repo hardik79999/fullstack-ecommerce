@@ -22,6 +22,6 @@ class Config:
 
     # 📁 File Upload Settings
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'shop', 'static', 'uploads', 'products')
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'frontend', 'static', 'uploads', 'products')
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # Max 5MB file allowed
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}

@@ -3,7 +3,7 @@ import uuid
 import json
 from werkzeug.utils import secure_filename
 from flask import Blueprint, request, jsonify, current_app
-from shop.models import Product, ProductImage, User, Category, Specification
+from shop.models import Product, ProductImage, User, Category, Specification, SellerCategory, Role
 from shop.extensions import db
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
@@ -195,10 +195,7 @@ def get_my_products(current_seller):
 #==============================================================================================================================
 #==============================================================================================================================
 
-from shop.models import SellerCategory, Category, Role
 from shop.utils.email_service import send_category_request_email_to_admin
-
-from shop.models import SellerCategory, Category
 
 @seller_bp.route('/category-request', methods=['POST'])
 @seller_required
@@ -213,14 +210,16 @@ def request_category_approval(current_seller):
     if not category:
         return jsonify({"error": "Category not found or inactive"}), 404
         
+    # Only check for ACTIVE requests (not declined ones)
     existing_request = SellerCategory.query.filter_by(
         seller_id=current_seller.id, 
-        category_id=category.id
+        category_id=category.id,
+        is_active=True  # 👈 Only check active requests
     ).first()
     
     if existing_request:
         status = "Approved" if existing_request.is_approved else "Pending"
-        return jsonify({"message": f"You already have a {status} request for this category."}), 400
+        return jsonify({"message": f"You already have a {status} request for this category. Please wait for admin approval."}), 400
         
     try:
         new_request = SellerCategory(
@@ -267,3 +266,53 @@ def request_category_approval(current_seller):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "Failed to submit request", "details": str(e)}), 500
+
+
+@seller_bp.route('/my-categories', methods=['GET'])
+@seller_required
+def get_my_categories(current_seller):
+    """Get all categories with seller's approval status"""
+    # Get ALL active categories from database
+    all_categories = Category.query.filter_by(is_active=True).all()
+    
+    # Get seller's SellerCategory records to check approval status
+    seller_categories = SellerCategory.query.filter_by(
+        seller_id=current_seller.id,
+        is_active=True
+    ).all()
+    
+    # Create a mapping of category_id to approval status
+    seller_category_map = {
+        sc.category_id: {
+            'is_approved': sc.is_approved,
+            'request_uuid': sc.uuid
+        } for sc in seller_categories
+    }
+    
+    result = []
+    for category in all_categories:
+        category_data = {
+            "uuid": category.uuid,
+            "name": category.name,
+            "description": category.description,
+            "id": category.id
+        }
+        
+        # Check seller's status for this category
+        if category.id in seller_category_map:
+            status_info = seller_category_map[category.id]
+            if status_info['is_approved']:
+                category_data['status'] = 'approved'
+                category_data['request_uuid'] = status_info['request_uuid']
+            else:
+                category_data['status'] = 'pending'
+                category_data['request_uuid'] = status_info['request_uuid']
+        else:
+            category_data['status'] = 'available'  # Seller hasn't requested this yet
+        
+        result.append(category_data)
+    
+    return jsonify({
+        "total_categories": len(result),
+        "categories": result
+    }), 200
