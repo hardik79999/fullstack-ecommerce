@@ -4,12 +4,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev_fallback_secret_key'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev_fallback_secret_key_with_minimum_length'
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    LOG_LEVEL = os.environ.get('LOG_LEVEL') or 'INFO'
     
     # Naya add kiya hai: JWT ke liye secret key
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'hardik_jwt_super_secret_key'
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or f'{SECRET_KEY}_jwt_signing_material'
 
     MAIL_SERVER = os.environ.get('MAIL_SERVER')
     MAIL_PORT = int(os.environ.get('MAIL_PORT') or 587)

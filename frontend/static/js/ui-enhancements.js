@@ -277,6 +277,61 @@
         document.body.appendChild(modal);
     };
 
+    window.showConfirmModal = function({
+        title = 'Confirm action',
+        message = 'Are you sure you want to continue?',
+        note = '',
+        confirmLabel = 'Confirm',
+        cancelLabel = 'Cancel',
+        tone = 'warning',
+    } = {}) {
+        window.closeAppModal?.();
+
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            const confirmClass = tone === 'danger'
+                ? 'w-full px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition font-semibold'
+                : 'w-full px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition font-semibold';
+
+            modal.className = 'app-modal';
+            modal.innerHTML = `
+                <div class="app-modal-backdrop"></div>
+                <div class="app-modal-card">
+                    <div class="app-modal-icon">${tone === 'danger' ? '!' : '?'}</div>
+                    <h2 class="text-3xl font-bold text-gray-900">${window.escapeHtml(title)}</h2>
+                    <p class="text-gray-600 mt-3">${window.escapeHtml(message)}</p>
+                    ${note ? `<div class="app-modal-note">${window.escapeHtml(note)}</div>` : ''}
+                    <div class="app-modal-actions">
+                        <button type="button" data-confirm-action="confirm" class="${confirmClass}">
+                            ${window.escapeHtml(confirmLabel)}
+                        </button>
+                        <button type="button" data-confirm-action="cancel" class="w-full px-4 py-3 bg-gray-200 text-gray-900 rounded-xl hover:bg-gray-300 transition font-semibold">
+                            ${window.escapeHtml(cancelLabel)}
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            const finalize = (confirmed) => {
+                modal.remove();
+                resolve(Boolean(confirmed));
+            };
+
+            modal.querySelector('.app-modal-backdrop')?.addEventListener('click', () => finalize(false));
+            modal.querySelector('[data-confirm-action="cancel"]')?.addEventListener('click', () => finalize(false));
+            modal.querySelector('[data-confirm-action="confirm"]')?.addEventListener('click', () => finalize(true));
+
+            document.body.appendChild(modal);
+        });
+    };
+
+    window.requestConfirmation = function(message, options = {}) {
+        return window.showConfirmModal({
+            message,
+            ...options,
+        });
+    };
+
     window.closeMobileMenu = function() {
         const mobileMenu = document.getElementById('mobile-menu');
         if (mobileMenu) {
@@ -741,7 +796,12 @@
     };
 
     window.deleteSellerProduct = async function(productUuid, triggerEl = null) {
-        if (!confirm('Delete this product from the storefront?')) {
+        const confirmed = await window.requestConfirmation?.('Delete this product from the storefront?', {
+            title: 'Delete product',
+            confirmLabel: 'Delete Product',
+            tone: 'danger',
+        });
+        if (!confirmed) {
             return;
         }
 
@@ -974,7 +1034,12 @@
     };
 
     window.declineCategoryRequest = async function(requestUuid, triggerEl = null) {
-        if (!confirm('Are you sure you want to decline this request?')) {
+        const confirmed = await window.requestConfirmation?.('Are you sure you want to decline this request?', {
+            title: 'Decline request',
+            confirmLabel: 'Decline Request',
+            tone: 'danger',
+        });
+        if (!confirmed) {
             return;
         }
 

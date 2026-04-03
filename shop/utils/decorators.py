@@ -1,37 +1,46 @@
 from functools import wraps
-from flask import jsonify
-from flask_jwt_extended import verify_jwt_in_request, get_jwt
 
-def admin_required():
-    def wrapper(fn):
-        @wraps(fn)
-        def decorator(*args, **kwargs):
-            # 1. Pehle check karo ki request me JWT token hai ya nahi
-            verify_jwt_in_request()
-            
-            # 2. Token ke andar se claims (extra data) nikalo
-            claims = get_jwt()
-            
-            # 3. Check karo ki role 'admin' hai ya nahi
-            if claims.get("role") != "admin":
-                return jsonify({"error": "Admin access required!"}), 403
-            
-            # Agar admin hai, toh route ko aage chalne do
-            return fn(*args, **kwargs)
-        return decorator
-    return wrapper
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
-def seller_required():
-    def wrapper(fn):
+from shop.models import User
+from shop.utils.api_response import error_response
+
+
+def role_required(*allowed_roles, inject_user=False, kwarg_name="current_user"):
+    def decorator(fn):
         @wraps(fn)
-        def decorator(*args, **kwargs):
-            verify_jwt_in_request()
-            claims = get_jwt()
-            
-            # Seller route ko admin bhi access kar sake, isliye hum dono ko allow kar rahe hain
-            if claims.get("role") not in ["seller", "admin"]:
-                return jsonify({"error": "Seller access required!"}), 403
-            
+        @jwt_required()
+        def wrapper(*args, **kwargs):
+            current_user_uuid = get_jwt_identity()
+            user = User.query.filter_by(uuid=current_user_uuid, is_active=True).first()
+
+            if not user or user.role.role_name not in allowed_roles:
+                role_label = "/".join(role.title() for role in allowed_roles)
+                return error_response(
+                    f"Unauthorized access. {role_label} privileges required.",
+                    status_code=403,
+                )
+
+            if inject_user:
+                kwargs[kwarg_name] = user
+
             return fn(*args, **kwargs)
-        return decorator
-    return wrapper
+
+        return wrapper
+
+    return decorator
+
+
+def admin_required(fn=None, *, inject_user=False, kwarg_name="current_admin"):
+    decorator = role_required("admin", inject_user=inject_user, kwarg_name=kwarg_name)
+    return decorator(fn) if callable(fn) else decorator
+
+
+def seller_required(fn=None, *, inject_user=False, kwarg_name="current_seller"):
+    decorator = role_required("seller", inject_user=inject_user, kwarg_name=kwarg_name)
+    return decorator(fn) if callable(fn) else decorator
+
+
+def customer_required(fn=None, *, inject_user=False, kwarg_name="current_customer"):
+    decorator = role_required("customer", inject_user=inject_user, kwarg_name=kwarg_name)
+    return decorator(fn) if callable(fn) else decorator

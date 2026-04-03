@@ -4,7 +4,7 @@
 // ============================================
 
 const CONFIG = {
-    API_BASE_URL: 'http://127.0.0.1:5000/api',
+    API_BASE_URL: '/api',
     TOKEN_KEY: 'authToken',
     USER_KEY: 'user',
     CART_KEY: 'cart',
@@ -46,10 +46,15 @@ const AppState = {
     },
     
     updateCartBadge() {
-        const badge = document.getElementById('cart-badge');
-        if (badge) {
-            badge.textContent = String(getCartCount(this.cart));
-        }
+        const count = String(getCartCount(this.cart));
+
+        ['cart-badge', 'mobile-cart-badge'].forEach((id) => {
+            const badge = document.getElementById(id);
+            if (!badge) return;
+
+            badge.textContent = count;
+            badge.classList.toggle('is-empty', count === '0');
+        });
     },
     
     persist() {
@@ -115,6 +120,10 @@ function normalizeCartItem(item = {}) {
         quantity,
         itemTotal,
         image: item.image || item.product_image || item.primary_image || null,
+        stock: Number(item.stock || 0) || 0,
+        category: item.category || null,
+        seller: item.seller || null,
+        description: item.description || '',
     };
 }
 
@@ -779,9 +788,20 @@ const API = {
                     : null;
             }
 
+            if (response.ok && data?.success === false) {
+                const message = data?.message || data?.error || 'Request failed';
+                console.error('[API] Logical failure:', message);
+                if (!suppressErrorToast) {
+                    showToast(message, 'error');
+                }
+                return includeResponseMeta
+                    ? { ok: false, status: response.status, data, message }
+                    : null;
+            }
+
             // Handle other errors
             if (!response.ok) {
-                const msg = data?.error || data?.message || `Error ${response.status}`;
+                const msg = data?.message || data?.error || `Error ${response.status}`;
                 console.error(`[API] ${response.status}:`, msg);
                 if (!suppressErrorToast) {
                     showToast(msg, 'error');
@@ -821,6 +841,10 @@ const API = {
 
     async signup(username, email, password, role) {
         return this.call('/auth/signup', 'POST', { username, email, password, role });
+    },
+
+    async logout() {
+        return this.call('/auth/logout', 'POST', null, { suppressErrorToast: true });
     },
 
     // ✅ Profile & Cart
@@ -870,6 +894,17 @@ const API = {
 
     async fetchProductDetail(uuid) {
         return this.call(`/user/product/${uuid}`, 'GET');
+    },
+
+    async fetchWishlist() {
+        return this.call('/user/wishlist', 'GET', null, { suppressErrorToast: true });
+    },
+
+    async saveWishlistItem(product_uuid, saved = null, requestConfig = {}) {
+        return this.call('/user/wishlist', 'POST', { product_uuid, saved }, {
+            suppressErrorToast: true,
+            ...requestConfig,
+        });
     },
 
     // ✅ Checkout
@@ -931,10 +966,10 @@ function showToast(message, type = 'info', duration = 3000) {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     
-    const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+    const icons = { success: 'OK', error: 'NO', warning: '!!', info: 'i' };
     
     toast.innerHTML = `
-        <span class="toast-icon">${icons[type] || '●'}</span>
+        <span class="toast-icon">${icons[type] || 'i'}</span>
         <span>${escapeHtml(message)}</span>
     `;
     
@@ -945,6 +980,8 @@ function showToast(message, type = 'info', duration = 3000) {
         setTimeout(() => toast.remove(), 300);
     }, duration);
 }
+
+window.showToast = showToast;
 
 function escapeHtml(text) {
     if (!text) return '';
@@ -1266,7 +1303,15 @@ async function handleSignup(event) {
     }
 }
 
-function logout() {
+async function logout() {
+    if (AppState.token) {
+        try {
+            await API.logout();
+        } catch (error) {
+            console.warn('[AUTH] Logout acknowledgement failed:', error);
+        }
+    }
+
     AppState.clear();
     updateUIBasedOnAuth();
     
@@ -1558,28 +1603,13 @@ function buildImageUrl(imageUrl) {
         return imageUrl;
     }
     
-    // If it's a relative path starting with /, prepend just the domain
+    // If it's already an app-relative path, keep it relative.
     if (imageUrl.startsWith('/')) {
-        const baseUrl = CONFIG.API_BASE_URL.replace('/api', '');
-        return `${baseUrl}${imageUrl}`;
+        return imageUrl;
     }
     
     // Otherwise construct it relative to the upload directory
-    const baseUrl = CONFIG.API_BASE_URL.replace('/api', '');
-    return `${baseUrl}/static/uploads/products/${imageUrl}`;
-}
-
-function escapeHtml(text) {
-    if (!text) return '';
-    if (typeof text !== 'string') return String(text);
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return text.replace(/[&<>"']/g, m => map[m]);
+    return `/static/uploads/products/${imageUrl}`;
 }
 
 // Category filter state
@@ -2519,7 +2549,12 @@ async function approveCategoryRequest(requestUuid) {
 }
 
 async function declineCategoryRequest(requestUuid) {
-    if (confirm('Are you sure you want to decline this request?')) {
+    const confirmed = await window.requestConfirmation?.('Are you sure you want to decline this request?', {
+        title: 'Decline request',
+        confirmLabel: 'Decline Request',
+        tone: 'danger',
+    });
+    if (confirmed) {
         const response = await API.call(`/admin/category-request/${requestUuid}/decline`, 'PUT', {});
         if (response) {
             showToast('Request declined!', 'warning');
@@ -3331,4 +3366,3 @@ async function loadOrderTracking(orderUuid) {
         `).join('') : '<div class="text-center text-gray-500">No tracking information available</div>';
     }
 }
-

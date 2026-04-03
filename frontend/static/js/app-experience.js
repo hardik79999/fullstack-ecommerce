@@ -586,7 +586,11 @@
             return;
         }
 
-        const confirmed = window.confirm(`Delete the saved address for ${address.full_name}?`);
+        const confirmed = await window.requestConfirmation?.(`Delete the saved address for ${address.full_name}?`, {
+            title: 'Delete address',
+            confirmLabel: 'Delete Address',
+            tone: 'danger',
+        });
         if (!confirmed) {
             return;
         }
