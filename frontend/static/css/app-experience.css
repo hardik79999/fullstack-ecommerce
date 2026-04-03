@@ -8,16 +8,16 @@
     --border-color: var(--store-border);
     --surface-shadow: var(--store-shadow);
     --surface-shadow-hover: var(--store-shadow-hover);
-    --field-bg: rgba(255, 255, 255, 0.78);
-    --field-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
+    --field-bg: color-mix(in srgb, var(--card-bg-strong) 92%, #ffffff 8%);
+    --field-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
     --danger-color: var(--store-danger);
     --success-color: var(--store-success);
     --primary: var(--primary-color);
     --text-primary: var(--text-color);
     --text-secondary: var(--muted-text-color);
     --border: var(--border-color);
-    --light: color-mix(in srgb, var(--background-color) 88%, #ffffff 12%);
-    --light-2: color-mix(in srgb, var(--background-color) 92%, #ffffff 8%);
+    --light: color-mix(in srgb, var(--background-color) 92%, var(--card-bg-strong) 8%);
+    --light-2: color-mix(in srgb, var(--background-color) 84%, var(--card-bg-strong) 16%);
 }
 
 html {
@@ -26,7 +26,7 @@ html {
 
 html[data-theme="dark"] {
     color-scheme: dark;
-    --field-bg: rgba(10, 18, 34, 0.82);
+    --field-bg: color-mix(in srgb, var(--card-bg-strong) 86%, var(--background-color) 14%);
     --field-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -1051,6 +1051,153 @@ html[data-theme="dark"] .payment-otp-input {
 
 .checkout-total-row {
     margin-top: 1.2rem;
+}
+
+/* ============================================
+   Premium Theme Refinement
+   ============================================ */
+
+body.app-body :where(.bg-white, .card, .activity-dialog, .app-modal-card) {
+    background: color-mix(in srgb, var(--card-bg-strong) 94%, transparent) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--surface-shadow) !important;
+}
+
+body.app-body :where(.bg-gray-50, .bg-blue-50) {
+    background: color-mix(in srgb, var(--background-color) 90%, rgba(var(--store-product-rgb), 0.08) 10%) !important;
+}
+
+body.app-body :where(.bg-gray-200) {
+    background: color-mix(in srgb, var(--background-color) 76%, var(--border-color) 24%) !important;
+}
+
+.cart-summary-badge,
+.checkout-address-tag,
+.payment-option-badge,
+.payment-otp-pill,
+.payment-otp-status {
+    background: rgba(var(--store-product-rgb), 0.1);
+    border: 1px solid rgba(var(--store-product-rgb), 0.18);
+    color: var(--text-color);
+}
+
+.cart-summary-stat,
+.cart-item-card,
+.checkout-summary-row,
+.checkout-address-option,
+.payment-option-card,
+.payment-method-note {
+    background:
+        linear-gradient(165deg, rgba(var(--store-product-rgb), 0.06), color-mix(in srgb, var(--card-bg-strong) 96%, transparent)),
+        var(--card-bg-strong);
+    border-color: var(--border-color);
+}
+
+html[data-theme="dark"] .cart-summary-stat,
+html[data-theme="dark"] .cart-item-card,
+html[data-theme="dark"] .checkout-summary-row,
+html[data-theme="dark"] .checkout-address-option,
+html[data-theme="dark"] .payment-option-card,
+html[data-theme="dark"] .payment-method-note {
+    background:
+        linear-gradient(165deg, rgba(var(--store-product-rgb), 0.1), color-mix(in srgb, var(--card-bg-strong) 96%, transparent)),
+        var(--card-bg-strong);
+}
+
+.cart-primary-cta {
+    box-shadow: 0 14px 28px rgba(var(--store-product-rgb), 0.22);
+}
+
+.cart-secondary-cta,
+.checkout-address-add-button,
+.checkout-address-form-cancel,
+.checkout-address-action,
+.cart-qty-stepper {
+    background: color-mix(in srgb, var(--card-bg-strong) 92%, transparent);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.cart-empty-visual,
+.cart-item-media,
+.cart-item-fallback {
+    background: linear-gradient(145deg, rgba(var(--store-product-rgb), 0.14), color-mix(in srgb, var(--card-bg-strong) 74%, var(--background-color) 26%));
+    box-shadow: 0 14px 30px rgba(17, 24, 39, 0.1);
+}
+
+html[data-theme="dark"] .cart-empty-visual,
+html[data-theme="dark"] .cart-item-media,
+html[data-theme="dark"] .cart-item-fallback {
+    background: linear-gradient(145deg, rgba(var(--store-product-rgb), 0.18), color-mix(in srgb, var(--card-bg-strong) 82%, var(--background-color) 18%));
+}
+
+.cart-qty-button {
+    background: rgba(var(--store-product-rgb), 0.1);
+    color: var(--text-color);
+}
+
+.cart-remove-button {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
+.checkout-address-option.is-selected {
+    border-color: rgba(var(--store-product-rgb), 0.22);
+    box-shadow: 0 16px 30px rgba(17, 24, 39, 0.1);
+    background:
+        linear-gradient(165deg, rgba(var(--store-product-rgb), 0.08), color-mix(in srgb, var(--card-bg-strong) 96%, transparent)),
+        var(--card-bg-strong);
+}
+
+.checkout-address-selection {
+    border-color: color-mix(in srgb, var(--border-color) 80%, rgba(var(--store-product-rgb), 0.2) 20%);
+    background: color-mix(in srgb, var(--card-bg-strong) 88%, var(--background-color) 12%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+html[data-theme="dark"] .checkout-address-selection {
+    background: color-mix(in srgb, var(--card-bg-strong) 86%, var(--background-color) 14%);
+}
+
+.checkout-address-option.is-selected .checkout-address-selection {
+    border-color: rgba(var(--store-product-rgb), 0.48);
+    box-shadow:
+        0 0 0 4px rgba(var(--store-product-rgb), 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.checkout-address-action:hover {
+    border-color: rgba(var(--store-product-rgb), 0.22);
+    background: rgba(var(--store-product-rgb), 0.08);
+}
+
+.payment-option-badge {
+    color: var(--text-color);
+}
+
+.payment-otp-icon {
+    color: #fff;
+    background: linear-gradient(135deg, var(--primary-color), var(--store-accent-strong));
+    box-shadow: 0 14px 28px rgba(var(--store-product-rgb), 0.22);
+}
+
+.payment-otp-status.is-warning {
+    background: rgba(217, 119, 6, 0.12);
+    border: 1px solid rgba(217, 119, 6, 0.18);
+    color: #b45309;
+}
+
+.payment-otp-input {
+    background: var(--field-bg);
+    border-color: var(--border-color);
+}
+
+.payment-otp-input:focus {
+    border-color: rgba(var(--store-product-rgb), 0.38);
+    box-shadow: 0 0 0 4px rgba(var(--store-product-rgb), 0.12);
+}
+
+.checkout-summary-row {
+    box-shadow: 0 10px 22px rgba(17, 24, 39, 0.08);
 }
 
 @keyframes cartPulse {

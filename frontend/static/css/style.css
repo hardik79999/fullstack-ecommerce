@@ -3,23 +3,54 @@
    ============================================ */
 
 :root {
-    --primary: #2563eb;
-    --primary-dark: #1e40af;
-    --primary-light: #3b82f6;
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --primary-light: #6366f1;
     --danger: #dc2626;
     --success: #16a34a;
-    --warning: #ea580c;
-    --light: #f8fafc;
-    --light-2: #f1f5f9;
-    --dark: #0f172a;
-    --dark-2: #1e293b;
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --border: #e2e8f0;
-    --border-light: #f1f5f9;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+    --warning: #d97706;
+    --light: #f9fafb;
+    --light-2: #f3f4f6;
+    --dark: #0b0f14;
+    --dark-2: #111827;
+    --surface: #ffffff;
+    --surface-elevated: #f3f4f6;
+    --text-primary: #111827;
+    --text-secondary: #6b7280;
+    --border: #e5e7eb;
+    --border-light: #f3f4f6;
+    --focus-ring: rgba(79, 70, 229, 0.14);
+    --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.04);
+    --shadow-md: 0 12px 28px rgba(17, 24, 39, 0.08);
+    --shadow-lg: 0 24px 50px rgba(17, 24, 39, 0.1);
+}
+
+html {
+    color-scheme: light;
+}
+
+html[data-theme="dark"] {
+    color-scheme: dark;
+    --primary: #4f46e5;
+    --primary-dark: #6366f1;
+    --primary-light: #818cf8;
+    --danger: #f87171;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --light: #111827;
+    --light-2: #1f2937;
+    --dark: #0b0f14;
+    --dark-2: #111827;
+    --surface: #111827;
+    --surface-elevated: #1f2937;
+    --text-primary: #e5e7eb;
+    --text-secondary: #9ca3af;
+    --border: #2a3441;
+    --border-light: #1f2937;
+    --focus-ring: rgba(99, 102, 241, 0.22);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24);
+    --shadow-md: 0 16px 34px rgba(0, 0, 0, 0.32);
+    --shadow-lg: 0 28px 60px rgba(0, 0, 0, 0.42);
 }
 
 /* ============================================
@@ -40,7 +71,7 @@ html, body {
 }
 
 body {
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    background: linear-gradient(180deg, var(--light) 0%, color-mix(in srgb, var(--light) 84%, var(--surface-elevated) 16%) 100%);
     color: var(--text-primary);
     line-height: 1.6;
     letter-spacing: 0.3px;
@@ -1863,4 +1894,275 @@ body.dynamic-bg-indigo {
     width: 28px;
     height: 28px;
     color: white;
+}
+
+/* ============================================
+   Premium Theme Refinement
+   ============================================ */
+
+input,
+textarea,
+select {
+    background-color: var(--surface);
+    color: var(--text-primary);
+    border-color: var(--border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: color-mix(in srgb, var(--text-secondary) 58%, transparent);
+}
+
+.btn-primary,
+.product-actions .btn-primary,
+.category-filter-btn.active,
+.site-logo {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    box-shadow: 0 10px 24px rgba(79, 70, 229, 0.22);
+}
+
+.btn-primary:hover,
+.product-actions .btn-primary:hover,
+.category-filter-btn.active:hover,
+.site-logo:hover {
+    box-shadow: 0 14px 28px rgba(79, 70, 229, 0.28);
+}
+
+.btn-secondary,
+.category-filter-btn,
+.hero-stat-card,
+.hero-mini-card,
+.seller-dash-glance span,
+.dashboard-tabs,
+.surface-card,
+.card,
+.product-card,
+.activity-dialog,
+.app-modal-card {
+    border-color: var(--border);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary,
+.category-filter-btn,
+.hero-stat-card,
+.hero-mini-card,
+.seller-dash-glance span,
+.dashboard-tabs,
+.surface-card,
+.card,
+.activity-dialog,
+.app-modal-card {
+    background: color-mix(in srgb, var(--surface) 92%, var(--surface-elevated) 8%);
+}
+
+.btn-secondary:hover,
+.category-filter-btn:hover,
+.card:hover,
+.surface-card:hover,
+.product-card:hover {
+    border-color: color-mix(in srgb, var(--primary) 24%, var(--border));
+}
+
+.product-card {
+    border-color: var(--border);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, var(--surface-elevated) 4%), color-mix(in srgb, var(--surface) 72%, var(--surface-elevated) 28%));
+    box-shadow: var(--shadow-lg);
+}
+
+.product-card::after {
+    background: radial-gradient(circle, rgba(79, 70, 229, 0.12), transparent 72%);
+}
+
+.product-card:hover {
+    box-shadow: 0 28px 64px rgba(17, 24, 39, 0.14);
+    border-color: rgba(79, 70, 229, 0.22);
+}
+
+.product-image-container {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(229, 231, 235, 0.9));
+}
+
+.product-image-fallback {
+    background: linear-gradient(135deg, var(--primary), var(--dark-2));
+}
+
+.badge-success {
+    background-color: rgba(22, 163, 74, 0.12);
+    color: #166534;
+}
+
+.badge-warning {
+    background-color: rgba(217, 119, 6, 0.12);
+    color: #92400e;
+}
+
+.badge-danger {
+    background-color: rgba(220, 38, 38, 0.12);
+    color: #991b1b;
+}
+
+.badge-info,
+.section-eyebrow,
+.seller-eyebrow,
+.nav-role-chip,
+.app-modal-note {
+    background: rgba(79, 70, 229, 0.1);
+    color: var(--primary);
+}
+
+.seller-eyebrow-soft {
+    background: rgba(17, 24, 39, 0.06);
+    color: var(--text-primary);
+}
+
+.app-orb-one {
+    background: rgba(79, 70, 229, 0.16);
+}
+
+.app-orb-two {
+    background: rgba(17, 24, 39, 0.12);
+}
+
+.app-grid {
+    background-image:
+        linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+}
+
+.hero-copy,
+.hero-mini-card,
+.seller-products-shell {
+    border-color: var(--border);
+    box-shadow: var(--shadow-lg);
+}
+
+.hero-copy {
+    background:
+        linear-gradient(155deg, rgba(255, 255, 255, 0.94), rgba(243, 244, 246, 0.94)),
+        linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(17, 24, 39, 0.03));
+}
+
+html[data-theme="dark"] .hero-copy {
+    background:
+        linear-gradient(155deg, rgba(17, 24, 39, 0.96), rgba(31, 41, 55, 0.94)),
+        linear-gradient(135deg, rgba(79, 70, 229, 0.12), rgba(11, 15, 20, 0.22));
+}
+
+.hero-preview-card {
+    border-color: color-mix(in srgb, var(--border) 70%, rgba(79, 70, 229, 0.3) 30%);
+    box-shadow: 0 24px 56px rgba(17, 24, 39, 0.16);
+    background:
+        linear-gradient(135deg, rgba(17, 24, 39, 0.96), rgba(31, 41, 55, 0.94)),
+        linear-gradient(135deg, rgba(79, 70, 229, 0.16), transparent);
+}
+
+.hero-preview-label {
+    color: rgba(229, 231, 235, 0.78);
+}
+
+.hero-stat-card,
+.hero-mini-card,
+.seller-dash-glance span {
+    background: color-mix(in srgb, var(--surface) 90%, var(--surface-elevated) 10%);
+}
+
+.hero-mini-title,
+.activity-brand-title,
+.activity-title {
+    color: var(--text-primary);
+}
+
+.hero-mini-text,
+.activity-brand-subtitle,
+.activity-message,
+.seller-dash-subtitle,
+.nav-subtitle {
+    color: var(--text-secondary);
+}
+
+.metric-card {
+    box-shadow: 0 20px 44px rgba(17, 24, 39, 0.16) !important;
+}
+
+.metric-card-blue {
+    background: linear-gradient(180deg, #4f46e5, #4338ca) !important;
+}
+
+.metric-card-green {
+    background: linear-gradient(180deg, #1f2937, #111827) !important;
+}
+
+.metric-card-purple {
+    background: linear-gradient(180deg, #312e81, #111827) !important;
+}
+
+.metric-card-orange {
+    background: linear-gradient(180deg, #374151, #111827) !important;
+}
+
+.activity-backdrop,
+.app-modal-backdrop {
+    background: rgba(11, 15, 20, 0.44);
+}
+
+.activity-brand {
+    background: rgba(79, 70, 229, 0.08);
+}
+
+.activity-brand-mark {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+}
+
+.activity-spinner {
+    border-color: rgba(79, 70, 229, 0.18);
+    border-top-color: var(--primary);
+}
+
+body.dynamic-bg-primary,
+body.dynamic-bg-success,
+body.dynamic-bg-warning,
+body.dynamic-bg-pink,
+body.dynamic-bg-purple,
+body.dynamic-bg-cyan,
+body.dynamic-bg-red,
+body.dynamic-bg-amber,
+body.dynamic-bg-lime,
+body.dynamic-bg-teal,
+body.dynamic-bg-indigo {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.06) 0%, rgba(79, 70, 229, 0.02) 100%);
+}
+
+.category-filter-btn {
+    background-color: color-mix(in srgb, var(--surface) 92%, var(--surface-elevated) 8%);
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+
+.category-filter-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.14);
+}
+
+html[data-theme="dark"] .hero-stat-card,
+html[data-theme="dark"] .hero-mini-card,
+html[data-theme="dark"] .seller-dash-glance span,
+html[data-theme="dark"] .dashboard-tabs,
+html[data-theme="dark"] .activity-dialog,
+html[data-theme="dark"] .app-modal-card,
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .surface-card,
+html[data-theme="dark"] .category-filter-btn,
+html[data-theme="dark"] .btn-secondary {
+    background: color-mix(in srgb, var(--surface) 92%, var(--surface-elevated) 8%);
+    color: var(--text-primary);
 }
