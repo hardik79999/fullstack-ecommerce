@@ -154,7 +154,7 @@
     };
 
     const baseApiCall = API.call.bind(API);
-    API.call = async function(endpoint, method = 'GET', body = null) {
+    API.call = async function(endpoint, method = 'GET', body = null, requestConfig = {}) {
         const normalizedMethod = String(method || 'GET').toUpperCase();
         const shouldShowOverlay = normalizedMethod !== 'GET';
 
@@ -164,7 +164,7 @@
         }
 
         try {
-            return await baseApiCall(endpoint, method, body);
+            return await baseApiCall(endpoint, method, body, requestConfig);
         } finally {
             if (shouldShowOverlay) {
                 window.hideActivityOverlay();

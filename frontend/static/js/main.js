@@ -229,6 +229,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // CRITICAL: Initialize app (fetch fresh data if authenticated)
     await initApp();
+
+    document.getElementById('payment-otp-input')?.addEventListener('input', () => {
+        clearPaymentOtpInlineError();
+    });
     
     // Route to current hash
     router();
@@ -358,6 +362,25 @@ function setPaymentOtpLoading(isLoading, label = 'Verify Payment') {
     }
 }
 
+function setPaymentOtpInlineError(message = '') {
+    const input = document.getElementById('payment-otp-input');
+    const errorEl = document.getElementById('payment-otp-input-error');
+    const hasMessage = Boolean(String(message || '').trim());
+
+    if (input) {
+        input.classList.toggle('is-error', hasMessage);
+    }
+
+    if (errorEl) {
+        errorEl.textContent = hasMessage ? String(message).trim() : '';
+        errorEl.classList.toggle('hidden', !hasMessage);
+    }
+}
+
+function clearPaymentOtpInlineError() {
+    setPaymentOtpInlineError('');
+}
+
 function closePaymentOtpModal() {
     const modal = document.getElementById('otp-modal') || document.getElementById('payment-otp-modal');
     const input = document.getElementById('payment-otp-input');
@@ -371,6 +394,7 @@ function closePaymentOtpModal() {
         input.value = '';
     }
 
+    clearPaymentOtpInlineError();
     setPaymentOtpLoading(false);
 }
 
@@ -416,6 +440,7 @@ function showPaymentOtpModal(context = null) {
 
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
+    clearPaymentOtpInlineError();
     setPaymentOtpLoading(false);
 
     window.setTimeout(() => {
@@ -498,8 +523,10 @@ async function verifyPaymentOtp(event) {
         return;
     }
 
+    clearPaymentOtpInlineError();
+
     if (!/^\d{6}$/.test(otpCode)) {
-        showToast('Please enter a valid 6-digit OTP.', 'warning');
+        setPaymentOtpInlineError('Please enter a valid 6-digit OTP.');
         otpInput?.focus();
         return;
     }
@@ -507,13 +534,34 @@ async function verifyPaymentOtp(event) {
     setPaymentOtpLoading(true);
 
     try {
-        const response = await API.verifyPaymentOtp(pendingState.orderUuid, otpCode);
+        const response = await API.verifyPaymentOtpDetailed(pendingState.orderUuid, otpCode);
         if (!response) {
+            setPaymentOtpInlineError('Unable to verify OTP right now. Please try again.');
+            return;
+        }
+
+        // Support both the new `{ ok, data }` response shape and any plain
+        // success payload that may still arrive from a stale browser bundle.
+        if (typeof response.ok !== 'boolean') {
+            closePaymentOtpModal();
+            showToast(response.message || 'Payment verified successfully!', 'success');
+            await finalizeCheckoutPaymentSuccess(response.order_uuid || pendingState.orderUuid);
+            return;
+        }
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                return;
+            }
+
+            setPaymentOtpInlineError(response.message || 'Invalid OTP code. Please try again.');
+            otpInput?.focus();
+            otpInput?.select?.();
             return;
         }
 
         closePaymentOtpModal();
-        showToast(response.message || 'Payment verified successfully!', 'success');
+        showToast(response.data?.message || 'Payment verified successfully!', 'success');
         await finalizeCheckoutPaymentSuccess(pendingState.orderUuid);
     } finally {
         setPaymentOtpLoading(false);
@@ -665,8 +713,13 @@ const API = {
     /**
      * Base API call with comprehensive error handling
      */
-    async call(endpoint, method = 'GET', body = null) {
+    async call(endpoint, method = 'GET', body = null, requestConfig = {}) {
         try {
+            const {
+                suppressErrorToast = false,
+                includeResponseMeta = false,
+            } = requestConfig || {};
+
             // Prevent loading state from blocking GET requests
             if (AppState.isLoading && method !== 'GET') {
                 console.warn('[API] Request blocked: already loading');
@@ -706,8 +759,12 @@ const API = {
                 data = await response.json();
             } catch (e) {
                 console.error('[API] JSON parse failed:', e);
-                showToast('Invalid server response', 'error');
-                return null;
+                if (!suppressErrorToast) {
+                    showToast('Invalid server response', 'error');
+                }
+                return includeResponseMeta
+                    ? { ok: false, status: response.status || 0, data: null, message: 'Invalid server response' }
+                    : null;
             }
 
             // Handle 401 - Session expired
@@ -717,24 +774,36 @@ const API = {
                 updateUIBasedOnAuth();
                 showToast('Session expired. Please login again.', 'warning');
                 navigateTo('#login');
-                return null;
+                return includeResponseMeta
+                    ? { ok: false, status: 401, data, message: 'Session expired. Please login again.' }
+                    : null;
             }
 
             // Handle other errors
             if (!response.ok) {
                 const msg = data?.error || data?.message || `Error ${response.status}`;
                 console.error(`[API] ${response.status}:`, msg);
-                showToast(msg, 'error');
-                return null;
+                if (!suppressErrorToast) {
+                    showToast(msg, 'error');
+                }
+                return includeResponseMeta
+                    ? { ok: false, status: response.status, data, message: msg }
+                    : null;
             }
 
             console.log('[API] Response:', data);
-            return data;
+            return includeResponseMeta
+                ? { ok: true, status: response.status, data, message: data?.message || '' }
+                : data;
 
         } catch (error) {
             console.error('[API] Fetch failed:', error);
-            showToast('Network error. Please try again.', 'error');
-            return null;
+            if (!suppressErrorToast) {
+                showToast('Network error. Please try again.', 'error');
+            }
+            return includeResponseMeta
+                ? { ok: false, status: 0, data: null, message: 'Network error. Please try again.' }
+                : null;
         } finally {
             AppState.isLoading = false;
         }
@@ -830,6 +899,15 @@ const API = {
 
     async verifyPaymentOtp(order_uuid, otp_code) {
         return this.call('/user/checkout/verify', 'POST', { order_uuid, otp_code });
+    },
+
+    async verifyPaymentOtpDetailed(order_uuid, otp_code) {
+        return this.call(
+            '/user/checkout/verify',
+            'POST',
+            { order_uuid, otp_code },
+            { suppressErrorToast: true, includeResponseMeta: true }
+        );
     },
 
     // ✅ Orders

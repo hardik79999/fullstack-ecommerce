@@ -20,7 +20,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="../static/css/style.css">
     <link rel="stylesheet" href="../static/css/storefront.css">
-    <link rel="stylesheet" href="../static/css/app-experience.css">
+    <link rel="stylesheet" href="../static/css/app-experience.css?v=20260403-otp-fix">
 </head>
 <body class="app-body bg-gray-50">
     <div class="app-orb app-orb-one" aria-hidden="true"></div>
@@ -1125,6 +1125,7 @@
                     placeholder="Enter 6-digit OTP"
                     aria-label="Payment OTP"
                 >
+                <p id="payment-otp-input-error" class="payment-otp-inline-error hidden" aria-live="polite"></p>
                 <div class="payment-otp-actions">
                     <button id="payment-otp-verify-button" type="submit" class="cart-primary-cta" data-ripple>Verify Payment</button>
                     <button id="payment-otp-resend" type="button" class="cart-secondary-cta" onclick="resendPaymentOtp()">Resend OTP</button>
@@ -1135,10 +1136,10 @@
         </div>
     </div>
 
-    <script src="../static/js/main.js"></script>
-    <script src="../static/js/ui-enhancements.js"></script>
+    <script src="../static/js/main.js?v=20260403-otp-fix"></script>
+    <script src="../static/js/ui-enhancements.js?v=20260403-otp-fix"></script>
     <script src="../static/js/color-extractor.js"></script>
     <script src="../static/js/storefront.js"></script>
-    <script src="../static/js/app-experience.js"></script>
+    <script src="../static/js/app-experience.js?v=20260403-otp-fix"></script>
 </body>
 </html>

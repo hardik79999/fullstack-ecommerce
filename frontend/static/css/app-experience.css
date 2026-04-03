@@ -941,6 +941,7 @@ html[data-theme="dark"] .checkout-address-form-cancel {
     color: var(--text-color);
     font-size: 1rem;
     font-weight: 800;
+    overflow-wrap: anywhere;
 }
 
 .payment-otp-status {
@@ -951,6 +952,7 @@ html[data-theme="dark"] .checkout-address-form-cancel {
     color: var(--text-color);
     font-size: 0.92rem;
     line-height: 1.6;
+    overflow-wrap: anywhere;
 }
 
 .payment-otp-status.is-warning {
@@ -986,6 +988,21 @@ html[data-theme="dark"] .payment-otp-input {
     border-color: rgba(var(--store-product-rgb), 0.42);
     box-shadow: 0 0 0 4px rgba(var(--store-product-rgb), 0.12);
     transform: translateY(-1px);
+}
+
+.payment-otp-input.is-error {
+    border-color: rgba(239, 68, 68, 0.55);
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
+}
+
+.payment-otp-inline-error {
+    margin-top: 0.7rem;
+    padding: 0 0.2rem;
+    color: #b91c1c;
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
 }
 
 .payment-otp-actions {
