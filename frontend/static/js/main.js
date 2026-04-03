@@ -359,7 +359,7 @@ function setPaymentOtpLoading(isLoading, label = 'Verify Payment') {
 }
 
 function closePaymentOtpModal() {
-    const modal = document.getElementById('payment-otp-modal');
+    const modal = document.getElementById('otp-modal') || document.getElementById('payment-otp-modal');
     const input = document.getElementById('payment-otp-input');
 
     if (modal) {
@@ -375,7 +375,7 @@ function closePaymentOtpModal() {
 }
 
 function showPaymentOtpModal(context = null) {
-    const modal = document.getElementById('payment-otp-modal');
+    const modal = document.getElementById('otp-modal') || document.getElementById('payment-otp-modal');
     const otpInput = document.getElementById('payment-otp-input');
     const pendingState = context?.orderUuid ? context : loadPendingPaymentVerification();
 
@@ -461,7 +461,7 @@ async function resendPaymentOtp() {
     }
 
     try {
-        const response = await API.processPayment(pendingState.orderUuid, pendingState.paymentMethod);
+        const response = await API.initiateCheckout(null, pendingState.paymentMethod, pendingState.orderUuid);
         if (!response) {
             return;
         }
@@ -545,43 +545,18 @@ async function handlePaymentWithOtp(event) {
         return;
     }
 
-    const checkoutResponse = await API.checkout(AppState.selectedAddress);
+    const checkoutResponse = await API.initiateCheckout(AppState.selectedAddress, paymentMethod);
     if (!checkoutResponse?.order_uuid) {
         return;
     }
 
     const orderUuid = checkoutResponse.order_uuid;
     AppState.currentOrder = orderUuid;
-    const expectsOtp = ['card', 'upi', 'netbanking'].includes(paymentMethod);
 
-    if (expectsOtp) {
-        savePendingPaymentVerification(orderUuid, paymentMethod, {
-            emailStatus: 'failed',
-            expiresInMinutes: 10,
-        });
-    }
-
-    const paymentResponse = await API.processPayment(orderUuid, paymentMethod);
-    if (!paymentResponse) {
-        if (expectsOtp) {
-            showToast('Order created. Resend OTP to continue your online payment.', 'warning');
-            showPaymentOtpModal(loadPendingPaymentVerification());
-        }
-        return;
-    }
-
-    if (paymentResponse.require_otp) {
-        if (isCustomerSession()) {
-            try {
-                await syncCustomerCart({ mergeLocal: false });
-            } catch (error) {
-                console.warn('[PAYMENT] Cart sync after OTP initiation failed:', error);
-            }
-        }
-
+    if (checkoutResponse.require_otp) {
         const nextState = savePendingPaymentVerification(orderUuid, paymentMethod, {
-            emailStatus: paymentResponse.email_status,
-            expiresInMinutes: paymentResponse.expires_in_minutes,
+            emailStatus: checkoutResponse.email_status,
+            expiresInMinutes: checkoutResponse.expires_in_minutes,
         });
 
         if (typeof ui?.renderCheckoutSummary === 'function') {
@@ -589,14 +564,14 @@ async function handlePaymentWithOtp(event) {
         }
 
         showToast(
-            paymentResponse.message || 'OTP sent to your email.',
-            paymentResponse.email_status === 'failed' ? 'warning' : 'success'
+            checkoutResponse.message || 'OTP sent to your email.',
+            checkoutResponse.email_status === 'failed' ? 'warning' : 'success'
         );
         showPaymentOtpModal(nextState);
         return;
     }
 
-    showToast(paymentResponse.message || 'Payment completed successfully!', 'success');
+    showToast(checkoutResponse.message || 'Payment completed successfully!', 'success');
     await finalizeCheckoutPaymentSuccess(orderUuid);
 }
 
@@ -840,6 +815,10 @@ const API = {
         return this.call(`/user/address/${addressUuid}`, 'DELETE');
     },
 
+    async initiateCheckout(address_uuid, payment_method, order_uuid = null) {
+        return this.call('/user/checkout/initiate', 'POST', { address_uuid, payment_method, order_uuid });
+    },
+
     async checkout(address_uuid) {
         return this.call('/user/checkout', 'POST', { address_uuid });
     },
@@ -849,7 +828,7 @@ const API = {
     },
 
     async verifyPaymentOtp(order_uuid, otp_code) {
-        return this.call('/user/payment/verify', 'POST', { order_uuid, otp_code });
+        return this.call('/user/checkout/verify', 'POST', { order_uuid, otp_code });
     },
 
     // ✅ Orders
@@ -2909,7 +2888,7 @@ function showPaymentSuccessNotification(order) {
     modal.innerHTML = `
         <div class="modal-content" style="text-align: center;">
             <div style="font-size: 64px; margin-bottom: 20px; animation: bounce 0.6s;">✅</div>
-            <h2 style="font-size: 28px; font-weight: bold; margin-bottom: 12px; color: #16a34a;">Payment Successful!</h2>
+            <h2 style="font-size: 28px; font-weight: bold; margin-bottom: 12px; color: #16a34a;">Order Confirmed!</h2>
             <p style="color: #666; margin-bottom: 8px;">Your order has been placed successfully.</p>
             <p style="color: #999; margin-bottom: 20px; font-size: 14px;">OrderID: ${order}</p>
             <div style="background: #f0fdf4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">

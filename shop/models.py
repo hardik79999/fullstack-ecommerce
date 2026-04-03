@@ -76,6 +76,7 @@ class Otp(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=True)
     otp_code = db.Column(db.String(10), nullable=False)
     action = db.Column(db.Enum(OTPAction), default=OTPAction.verification)
     is_used = db.Column(db.Boolean, default=False)
@@ -87,6 +88,8 @@ class Otp(db.Model):
     updated_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, server_default=db.func.now())
+
+    order = db.relationship('Order', foreign_keys=[order_id], backref='otps', lazy=True)
 
 class Address(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -237,6 +240,7 @@ class Order(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     address_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False) 
     total_amount = db.Column(db.Float, nullable=False)
+    payment_method = db.Column(db.Enum(PaymentMethod), nullable=True)
     status = db.Column(db.Enum(OrderStatus), default=OrderStatus.pending) 
     
     # 6 MANDATORY FIELDS

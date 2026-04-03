@@ -167,17 +167,125 @@ def customer_required(fn):
 # PAYMENT HELPERS
 #================================================================================================================
 
+class CheckoutFlowError(Exception):
+    def __init__(self, message, status_code=400):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+
+
 def _serialize_order_items(order):
     return [{
         "product_name": item.product.name if getattr(item, 'product', None) else f"Product #{item.product_id}",
         "quantity": item.quantity,
         "line_total": float(item.price_at_purchase) * item.quantity
-    } for item in order.items]
+    } for item in order.items if item.is_active]
 
 
-def _invalidate_unused_payment_otps(customer_id, actor_id):
+def _get_payment_method_enum(payment_method_str):
+    if not payment_method_str:
+        raise CheckoutFlowError("payment_method is required", 400)
+
+    try:
+        return PaymentMethod(str(payment_method_str).strip().lower())
+    except ValueError:
+        raise CheckoutFlowError(
+            f"Unsupported payment method. Allowed options: {', '.join(method.value for method in PaymentMethod)}",
+            400
+        )
+
+
+def _lock_active_cart_items(current_customer):
+    cart_items = CartItem.query.filter_by(
+        user_id=current_customer.id,
+        is_active=True
+    ).with_for_update().all()
+
+    if not cart_items:
+        raise CheckoutFlowError("Cart is empty", 400)
+
+    return cart_items
+
+
+def _validate_cart_items_and_collect_snapshot(cart_items):
+    total_amount = 0.0
+    snapshot = []
+
+    for cart_item in cart_items:
+        if cart_item.quantity < 1:
+            raise CheckoutFlowError("Cart contains an invalid quantity", 400)
+
+        product = Product.query.filter_by(
+            id=cart_item.product_id,
+            is_active=True
+        ).with_for_update().first()
+
+        if not product:
+            raise CheckoutFlowError("One of the cart products is unavailable", 404)
+
+        if product.stock < cart_item.quantity:
+            raise CheckoutFlowError(
+                f"Only {product.stock} unit(s) of {product.name} are available right now.",
+                409
+            )
+
+        item_total = float(product.price) * cart_item.quantity
+        total_amount += item_total
+        snapshot.append({
+            "product": product,
+            "cart_item": cart_item,
+            "quantity": cart_item.quantity,
+            "price_at_purchase": float(product.price),
+        })
+
+    return snapshot, total_amount
+
+
+def _create_order_from_snapshot(current_customer, address, payment_method_enum, snapshot, total_amount):
+    order = Order(
+        user_id=current_customer.id,
+        address_id=address.id,
+        total_amount=total_amount,
+        payment_method=payment_method_enum,
+        status=OrderStatus.pending,
+        created_by=current_customer.id,
+        updated_by=current_customer.id,
+        is_active=True
+    )
+    db.session.add(order)
+    db.session.flush()
+
+    for item in snapshot:
+        db.session.add(OrderItem(
+            order_id=order.id,
+            product_id=item["product"].id,
+            quantity=item["quantity"],
+            price_at_purchase=item["price_at_purchase"],
+            created_by=current_customer.id,
+            updated_by=current_customer.id,
+            is_active=True
+        ))
+
+    db.session.add(OrderTracking(
+        order_id=order.id,
+        status=OrderStatus.pending,
+        message=(
+            "Order created successfully and awaiting payment verification."
+            if payment_method_enum in VIRTUAL_PAYMENT_METHODS
+            else "Cash on Delivery selected. Your order is now moving to processing."
+        ),
+        created_by=current_customer.id,
+        updated_by=current_customer.id,
+        is_active=True
+    ))
+
+    return order
+
+
+def _invalidate_unused_payment_otps(customer_id, order_id, actor_id):
     Otp.query.filter_by(
         user_id=customer_id,
+        order_id=order_id,
         action=OTPAction.verification,
         is_used=False,
         is_active=True
@@ -187,10 +295,11 @@ def _invalidate_unused_payment_otps(customer_id, actor_id):
     }, synchronize_session=False)
 
 
-def _generate_payment_otp(current_customer):
+def _generate_payment_otp(current_customer, order):
     otp_code = f"{random.randint(0, 999999):06d}"
     otp_entry = Otp(
         user_id=current_customer.id,
+        order_id=order.id,
         otp_code=otp_code,
         action=OTPAction.verification,
         is_used=False,
@@ -203,33 +312,90 @@ def _generate_payment_otp(current_customer):
     return otp_entry, otp_code
 
 
-def _build_payment_tracking_message(payment_method_enum):
-    return f"Payment via {payment_method_enum.name.upper()} successful. Your order is now being processed."
-
-
 def _generate_transaction_id():
     return "TXN-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
 
 
-def _find_conflicting_pending_payment(current_customer, current_order_id):
-    return Order.query.join(Payment, Payment.order_id == Order.id).filter(
-        Order.user_id == current_customer.id,
-        Order.id != current_order_id,
-        Order.is_active == True,
-        Order.status == OrderStatus.pending,
-        Payment.user_id == current_customer.id,
-        Payment.is_active == True,
-        Payment.status == PaymentStatus.pending
-    ).order_by(Order.created_at.desc()).first()
+def _get_active_order_items(order):
+    return OrderItem.query.filter_by(order_id=order.id, is_active=True).all()
 
 
-def _finalize_order_payment(order, current_customer, payment_method_enum, payment_record=None):
-    transaction_id = None if payment_method_enum == PaymentMethod.cod else _generate_transaction_id()
+def _lock_products_for_order(order):
+    locked_products = {}
+
+    for order_item in _get_active_order_items(order):
+        product = Product.query.filter_by(
+            id=order_item.product_id,
+            is_active=True
+        ).with_for_update().first()
+
+        if not product:
+            raise CheckoutFlowError("One of the ordered products is unavailable", 404)
+
+        if product.stock < order_item.quantity:
+            raise CheckoutFlowError(
+                f"Stock changed before verification. Only {product.stock} unit(s) of {product.name} remain.",
+                409
+            )
+
+        locked_products[product.id] = product
+
+    return locked_products
+
+
+def _apply_stock_deduction(order, locked_products):
+    for order_item in _get_active_order_items(order):
+        locked_products[order_item.product_id].stock -= order_item.quantity
+
+
+def _sync_cart_after_checkout(current_customer, order):
+    active_cart_items = {
+        item.product_id: item
+        for item in CartItem.query.filter_by(
+            user_id=current_customer.id,
+            is_active=True
+        ).with_for_update().all()
+    }
+
+    for order_item in _get_active_order_items(order):
+        cart_item = active_cart_items.get(order_item.product_id)
+        if not cart_item:
+            continue
+
+        if cart_item.quantity <= order_item.quantity:
+            cart_item.is_active = False
+        else:
+            cart_item.quantity -= order_item.quantity
+
+        cart_item.updated_by = current_customer.id
+
+
+def _build_processing_tracking_message(payment_method_enum, payment_status):
+    if payment_method_enum == PaymentMethod.cod:
+        return "Cash on Delivery confirmed. Your order is now being processed and payment will be collected on delivery."
+
+    if payment_status == PaymentStatus.completed:
+        return f"Payment via {payment_method_enum.value.upper()} verified successfully. Your order is now being processed."
+
+    return f"Payment via {payment_method_enum.value.upper()} is pending while your order moves to processing."
+
+
+def _finalize_order_payment(order, current_customer, payment_status):
+    payment_method_enum = order.payment_method
+    if not payment_method_enum:
+        raise CheckoutFlowError("Order payment method is missing", 400)
+
+    locked_products = _lock_products_for_order(order)
+    _apply_stock_deduction(order, locked_products)
+    _sync_cart_after_checkout(current_customer, order)
+
+    transaction_id = _generate_transaction_id() if payment_status == PaymentStatus.completed else None
+    payment_record = order.payment
 
     if payment_record:
         payment_record.payment_method = payment_method_enum
         payment_record.amount = order.total_amount
-        payment_record.status = PaymentStatus.completed
+        payment_record.status = payment_status
         payment_record.transaction_id = transaction_id
         payment_record.updated_by = current_customer.id
         payment_record.is_active = True
@@ -240,7 +406,7 @@ def _finalize_order_payment(order, current_customer, payment_method_enum, paymen
             transaction_id=transaction_id,
             payment_method=payment_method_enum,
             amount=order.total_amount,
-            status=PaymentStatus.completed,
+            status=payment_status,
             created_by=current_customer.id,
             updated_by=current_customer.id,
             is_active=True
@@ -253,7 +419,7 @@ def _finalize_order_payment(order, current_customer, payment_method_enum, paymen
     tracking_entry = OrderTracking(
         order_id=order.id,
         status=OrderStatus.processing,
-        message=_build_payment_tracking_message(payment_method_enum),
+        message=_build_processing_tracking_message(payment_method_enum, payment_status),
         created_by=current_customer.id,
         updated_by=current_customer.id,
         is_active=True
@@ -271,191 +437,47 @@ def _finalize_order_payment(order, current_customer, payment_method_enum, paymen
         )
         db.session.add(invoice_record)
 
-    _invalidate_unused_payment_otps(current_customer.id, current_customer.id)
+    _invalidate_unused_payment_otps(current_customer.id, order.id, current_customer.id)
 
     return {
         "payment": payment_record,
         "invoice": invoice_record,
         "transaction_id": transaction_id or "N/A",
-        "tracking_message": _build_payment_tracking_message(payment_method_enum),
+        "tracking_message": _build_processing_tracking_message(payment_method_enum, payment_status),
     }
 
 
 def _checkout_customer_order(current_customer):
     data = request.get_json() or {}
     address_uuid = str(data.get('address_uuid') or '').strip()
-
-    if not address_uuid:
-        return jsonify({"error": "address_uuid is required"}), 400
-
-    address = Address.query.filter_by(
-        uuid=address_uuid,
-        user_id=current_customer.id,
-        is_active=True
-    ).first()
-    if not address:
-        return jsonify({"error": "Invalid delivery address"}), 404
+    order_uuid = str(data.get('order_uuid') or '').strip()
+    payment_method_raw = data.get('payment_method')
 
     try:
-        cart_items = CartItem.query.filter_by(
-            user_id=current_customer.id,
-            is_active=True
-        ).with_for_update().all()
+        payment_method_enum = _get_payment_method_enum(payment_method_raw) if payment_method_raw else None
 
-        if not cart_items:
-            return jsonify({"error": "Cart is empty"}), 400
-
-        total_amount = 0.0
-        locked_products = {}
-        order_items_to_create = []
-
-        for item in cart_items:
-            if item.quantity < 1:
-                return jsonify({"error": "Cart contains an invalid quantity"}), 400
-
-            product = Product.query.filter_by(
-                id=item.product_id,
+        if order_uuid:
+            order = Order.query.filter_by(
+                uuid=order_uuid,
+                user_id=current_customer.id,
                 is_active=True
             ).with_for_update().first()
 
-            if not product:
-                return jsonify({"error": "One of the cart products is unavailable"}), 404
+            if not order:
+                raise CheckoutFlowError("Pending order not found", 404)
 
-            if product.stock < item.quantity:
-                return jsonify({
-                    "error": "Insufficient stock",
-                    "message": f"Only {product.stock} unit(s) of {product.name} are available right now."
-                }), 409
+            if order.status != OrderStatus.pending:
+                raise CheckoutFlowError("This order is no longer awaiting verification.", 400)
 
-            locked_products[product.id] = product
-            total_amount += float(product.price) * item.quantity
-            order_items_to_create.append({
-                "product_id": product.id,
-                "quantity": item.quantity,
-                "price_at_purchase": float(product.price)
-            })
+            if order.payment_method not in VIRTUAL_PAYMENT_METHODS:
+                raise CheckoutFlowError("OTP verification is only available for online payments.", 400)
 
-        new_order = Order(
-            user_id=current_customer.id,
-            address_id=address.id,
-            total_amount=total_amount,
-            status=OrderStatus.pending,
-            created_by=current_customer.id,
-            updated_by=current_customer.id
-        )
-        db.session.add(new_order)
-        db.session.flush()
+            if payment_method_enum and payment_method_enum != order.payment_method:
+                raise CheckoutFlowError("Payment method mismatch for this pending order.", 400)
 
-        for item_payload in order_items_to_create:
-            db.session.add(OrderItem(
-                order_id=new_order.id,
-                product_id=item_payload["product_id"],
-                quantity=item_payload["quantity"],
-                price_at_purchase=item_payload["price_at_purchase"],
-                created_by=current_customer.id,
-                updated_by=current_customer.id
-            ))
-            locked_products[item_payload["product_id"]].stock -= item_payload["quantity"]
-
-        db.session.add(OrderTracking(
-            order_id=new_order.id,
-            status=OrderStatus.pending,
-            message="Order created successfully and awaiting payment confirmation.",
-            created_by=current_customer.id,
-            updated_by=current_customer.id,
-            is_active=True
-        ))
-
-        for item in cart_items:
-            item.is_active = False
-            item.updated_by = current_customer.id
-
-        db.session.commit()
-
-        return jsonify({
-            "message": "Order placed successfully!",
-            "order_uuid": new_order.uuid,
-            "total_payable": total_amount
-        }), 201
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": "Transaction failed", "details": str(e)}), 500
-
-
-def _process_payment_flow(current_customer):
-    data = request.get_json() or {}
-    order_uuid = str(data.get('order_uuid') or '').strip()
-    payment_method_str = str(data.get('payment_method') or '').strip().lower()
-
-    if not order_uuid or not payment_method_str:
-        return jsonify({"error": "order_uuid and payment_method are required"}), 400
-
-    try:
-        payment_method_enum = PaymentMethod(payment_method_str)
-    except ValueError:
-        return jsonify({
-            "error": "Invalid Payment Method",
-            "message": f"'{payment_method_str}' is not supported.",
-            "allowed_options": [method.value for method in PaymentMethod]
-        }), 400
-
-    try:
-        order = Order.query.filter_by(
-            uuid=order_uuid,
-            user_id=current_customer.id,
-            is_active=True
-        ).with_for_update().first()
-        if not order:
-            return jsonify({"error": "Order not found"}), 404
-
-        if order.status != OrderStatus.pending:
-            return jsonify({
-                "error": "Payment Already Completed",
-                "message": f"Payment for this order is no longer pending (Current Status: {order.status.name.capitalize()})."
-            }), 400
-
-        payment_record = Payment.query.filter_by(
-            order_id=order.id,
-            user_id=current_customer.id
-        ).with_for_update().first()
-
-        if payment_record and payment_record.status == PaymentStatus.completed:
-            return jsonify({
-                "error": "Payment Already Completed",
-                "message": f"This order has already been paid (TXN ID: {payment_record.transaction_id or 'N/A'})."
-            }), 400
-
-        if payment_method_enum in VIRTUAL_PAYMENT_METHODS:
-            conflicting_order = _find_conflicting_pending_payment(current_customer, order.id)
-            if conflicting_order:
-                return jsonify({
-                    "error": "Another payment verification is pending",
-                    "message": f"Please complete OTP verification for order #{conflicting_order.uuid[:8]} before starting another online payment."
-                }), 409
-
-            if payment_record:
-                payment_record.payment_method = payment_method_enum
-                payment_record.amount = order.total_amount
-                payment_record.status = PaymentStatus.pending
-                payment_record.transaction_id = None
-                payment_record.updated_by = current_customer.id
-                payment_record.is_active = True
-            else:
-                payment_record = Payment(
-                    order_id=order.id,
-                    user_id=current_customer.id,
-                    transaction_id=None,
-                    payment_method=payment_method_enum,
-                    amount=order.total_amount,
-                    status=PaymentStatus.pending,
-                    created_by=current_customer.id,
-                    updated_by=current_customer.id,
-                    is_active=True
-                )
-                db.session.add(payment_record)
-
-            _invalidate_unused_payment_otps(current_customer.id, current_customer.id)
-            _, otp_code = _generate_payment_otp(current_customer)
+            _lock_products_for_order(order)
+            _invalidate_unused_payment_otps(current_customer.id, order.id, current_customer.id)
+            _, otp_code = _generate_payment_otp(current_customer, order)
             db.session.commit()
 
             email_sent = send_payment_otp_email(
@@ -463,100 +485,128 @@ def _process_payment_flow(current_customer):
                 customer_name=current_customer.username or 'Customer',
                 order_uuid=order.uuid,
                 otp_code=otp_code,
-                payment_method=payment_method_enum.value,
+                payment_method=order.payment_method.value,
                 expires_in_minutes=PAYMENT_OTP_EXPIRY_MINUTES
             )
 
             return jsonify({
-                "message": "OTP sent to your email." if email_sent else "Payment initiated, but the OTP email could not be delivered. Please resend OTP.",
+                "message": "OTP sent" if email_sent else "OTP generated, but the email could not be delivered. Please try again.",
                 "require_otp": True,
                 "order_uuid": order.uuid,
-                "payment_method": payment_method_enum.value,
+                "payment_method": order.payment_method.value,
                 "expires_in_minutes": PAYMENT_OTP_EXPIRY_MINUTES,
                 "email_status": "sent" if email_sent else "failed"
             }), 200
 
-        result = _finalize_order_payment(
-            order=order,
-            current_customer=current_customer,
-            payment_method_enum=payment_method_enum,
-            payment_record=payment_record
-        )
+        if not address_uuid:
+            raise CheckoutFlowError("address_uuid is required", 400)
+
+        if not payment_method_enum:
+            raise CheckoutFlowError("payment_method is required", 400)
+
+        address = Address.query.filter_by(
+            uuid=address_uuid,
+            user_id=current_customer.id,
+            is_active=True
+        ).first()
+        if not address:
+            raise CheckoutFlowError("Invalid delivery address", 404)
+
+        cart_items = _lock_active_cart_items(current_customer)
+        snapshot, total_amount = _validate_cart_items_and_collect_snapshot(cart_items)
+        order = _create_order_from_snapshot(current_customer, address, payment_method_enum, snapshot, total_amount)
+
+        if payment_method_enum == PaymentMethod.cod:
+            result = _finalize_order_payment(order, current_customer, PaymentStatus.pending)
+            db.session.commit()
+
+            email_sent = send_order_status_email(
+                customer_email=current_customer.email,
+                customer_name=current_customer.username or 'Customer',
+                order_uuid=order.uuid,
+                order_status=order.status.name,
+                total_amount=order.total_amount,
+                items=_serialize_order_items(order),
+                latest_message=result["tracking_message"]
+            )
+
+            return jsonify({
+                "message": "Order placed successfully! Cash on Delivery selected.",
+                "require_otp": False,
+                "order_uuid": order.uuid,
+                "data": {
+                    "order_status": order.status.name,
+                    "transaction_id": result["transaction_id"],
+                    "invoice_number": result["invoice"].invoice_number,
+                    "payment_method": payment_method_enum.value,
+                    "payment_status": result["payment"].status.name
+                },
+                "email_status": "Order confirmation email sent successfully." if email_sent else "Order placed, but the confirmation email could not be sent."
+            }), 201
+
+        _, otp_code = _generate_payment_otp(current_customer, order)
         db.session.commit()
 
-        email_sent = send_order_status_email(
+        email_sent = send_payment_otp_email(
             customer_email=current_customer.email,
             customer_name=current_customer.username or 'Customer',
             order_uuid=order.uuid,
-            order_status=order.status.name,
-            total_amount=order.total_amount,
-            items=_serialize_order_items(order),
-            latest_message=result["tracking_message"]
+            otp_code=otp_code,
+            payment_method=payment_method_enum.value,
+            expires_in_minutes=PAYMENT_OTP_EXPIRY_MINUTES
         )
 
         return jsonify({
-            "message": "Payment Successful! Order tracking is now active.",
-            "require_otp": False,
-            "data": {
-                "order_status": order.status.name,
-                "transaction_id": result["transaction_id"],
-                "invoice_number": result["invoice"].invoice_number,
-                "payment_method": payment_method_enum.value
-            },
-            "email_status": "Order confirmation email sent successfully." if email_sent else "Payment completed, but the confirmation email could not be sent."
-        }), 200
+            "message": "OTP sent" if email_sent else "OTP generated, but the email could not be delivered. Please try again.",
+            "require_otp": True,
+            "order_uuid": order.uuid,
+            "payment_method": payment_method_enum.value,
+            "expires_in_minutes": PAYMENT_OTP_EXPIRY_MINUTES,
+            "email_status": "sent" if email_sent else "failed"
+        }), 201
+    except CheckoutFlowError as exc:
+        db.session.rollback()
+        return jsonify({"error": exc.message}), exc.status_code
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": "Payment failed", "details": str(e)}), 500
+        return jsonify({"error": "Checkout initiation failed", "details": str(e)}), 500
+
+
+def _process_payment_flow(current_customer):
+    return jsonify({
+        "error": "Deprecated endpoint",
+        "message": "Use /api/user/checkout/initiate and /api/user/checkout/verify for the two-phase checkout flow."
+    }), 410
 
 
 def _verify_payment_flow(current_customer):
     data = request.get_json() or {}
     order_uuid = str(data.get('order_uuid') or '').strip()
     otp_code = str(data.get('otp_code') or '').strip()
-
-    if not order_uuid or not otp_code:
-        return jsonify({"error": "order_uuid and otp_code are required"}), 400
-
-    if not otp_code.isdigit() or len(otp_code) != 6:
-        return jsonify({"error": "OTP must be a 6-digit code"}), 400
-
     try:
+        if not order_uuid or not otp_code:
+            raise CheckoutFlowError("order_uuid and otp_code are required", 400)
+
+        if not otp_code.isdigit() or len(otp_code) != 6:
+            raise CheckoutFlowError("OTP must be a 6-digit code", 400)
+
         order = Order.query.filter_by(
             uuid=order_uuid,
             user_id=current_customer.id,
             is_active=True
         ).with_for_update().first()
         if not order:
-            return jsonify({"error": "Order not found"}), 404
-
-        conflicting_order = _find_conflicting_pending_payment(current_customer, order.id)
-        if conflicting_order:
-            return jsonify({
-                "error": "Another payment verification is pending",
-                "message": f"Please complete OTP verification for order #{conflicting_order.uuid[:8]} first."
-            }), 409
+            raise CheckoutFlowError("Order not found", 404)
 
         if order.status != OrderStatus.pending:
-            return jsonify({
-                "error": "Payment already verified",
-                "message": f"This order is already in {order.status.name} state."
-            }), 400
+            raise CheckoutFlowError(f"This order is already in {order.status.name} state.", 400)
 
-        payment_record = Payment.query.filter_by(
-            order_id=order.id,
-            user_id=current_customer.id,
-            is_active=True
-        ).with_for_update().first()
-
-        if not payment_record or payment_record.status != PaymentStatus.pending:
-            return jsonify({"error": "No pending payment verification found for this order"}), 400
-
-        if payment_record.payment_method not in VIRTUAL_PAYMENT_METHODS:
-            return jsonify({"error": "OTP verification is only required for online payments"}), 400
+        if order.payment_method not in VIRTUAL_PAYMENT_METHODS:
+            raise CheckoutFlowError("OTP verification is only required for online payments", 400)
 
         otp_entry = Otp.query.filter_by(
             user_id=current_customer.id,
+            order_id=order.id,
             otp_code=otp_code,
             action=OTPAction.verification,
             is_used=False,
@@ -564,20 +614,16 @@ def _verify_payment_flow(current_customer):
         ).with_for_update().order_by(Otp.created_at.desc()).first()
 
         if not otp_entry:
-            return jsonify({"error": "Invalid OTP code"}), 400
+            raise CheckoutFlowError("Invalid OTP code", 400)
 
         if otp_entry.expires_at and otp_entry.expires_at < datetime.utcnow():
-            return jsonify({"error": "OTP has expired. Please request a new one."}), 400
+            raise CheckoutFlowError("OTP has expired. Please request a new one.", 400)
 
+        _lock_products_for_order(order)
         otp_entry.is_used = True
         otp_entry.updated_by = current_customer.id
 
-        result = _finalize_order_payment(
-            order=order,
-            current_customer=current_customer,
-            payment_method_enum=payment_record.payment_method,
-            payment_record=payment_record
-        )
+        result = _finalize_order_payment(order, current_customer, PaymentStatus.completed)
         db.session.commit()
 
         email_sent = send_order_status_email(
@@ -593,14 +639,19 @@ def _verify_payment_flow(current_customer):
         return jsonify({
             "message": "Payment verified successfully. Your order is now processing.",
             "require_otp": False,
+            "order_uuid": order.uuid,
             "data": {
                 "order_status": order.status.name,
                 "transaction_id": result["transaction_id"],
                 "invoice_number": result["invoice"].invoice_number,
-                "payment_method": payment_record.payment_method.value
+                "payment_method": order.payment_method.value,
+                "payment_status": result["payment"].status.name
             },
             "email_status": "Order confirmation email sent successfully." if email_sent else "Payment completed, but the confirmation email could not be sent."
         }), 200
+    except CheckoutFlowError as exc:
+        db.session.rollback()
+        return jsonify({"error": exc.message}), exc.status_code
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "OTP verification failed", "details": str(e)}), 500
@@ -862,6 +913,18 @@ def delete_address(current_customer, address_uuid):
 @user_bp.route('/payment/verify', methods=['POST'])
 @customer_required
 def verify_payment(current_customer):
+    return _verify_payment_flow(current_customer)
+
+
+@user_bp.route('/checkout/initiate', methods=['POST'])
+@customer_required
+def initiate_checkout(current_customer):
+    return _checkout_customer_order(current_customer)
+
+
+@user_bp.route('/checkout/verify', methods=['POST'])
+@customer_required
+def verify_checkout(current_customer):
     return _verify_payment_flow(current_customer)
 
 
@@ -1261,7 +1324,7 @@ def _build_tracking_payload(order):
         "summary": {
             "item_count": len(items),
             "total_amount": order.total_amount,
-            "payment_method": order.payment.payment_method.name if order.payment else None,
+            "payment_method": order.payment.payment_method.name if order.payment else (order.payment_method.name if order.payment_method else None),
             "payment_status": order.payment.status.name if order.payment else None,
         },
         "tracking_history": timeline,
@@ -1309,6 +1372,8 @@ def get_user_orders(current_customer):
             "status": order.status.name,
             "total_amount": order.total_amount,
             "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "payment_method": order.payment.payment_method.name if order.payment else (order.payment_method.name if order.payment_method else None),
+            "payment_status": order.payment.status.name if order.payment else None,
             "items": order_items,
             "item_count": len(order_items)
         })
