@@ -1,0 +1,35 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
+    <defs>
+        <linearGradient id="bagGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+        </linearGradient>
+        <linearGradient id="shineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
+            <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
+        </linearGradient>
+    </defs>
+    
+    <!-- Outer glow -->
+    <circle cx="50" cy="50" r="48" fill="none" stroke="url(#bagGradient)" stroke-width="2" opacity="0.3"/>
+    
+    <!-- Main bag body -->
+    <path d="M25 35 L75 35 L75 70 Q75 80 65 80 L35 80 Q25 80 25 70 Z" fill="url(#bagGradient)" stroke="#ffffff" stroke-width="1.5"/>
+    
+    <!-- Bag handles -->
+    <path d="M35 35 Q35 20 50 20 Q65 20 65 35" fill="none" stroke="url(#bagGradient)" stroke-width="4" stroke-linecap="round"/>
+    
+    <!-- Shopping cart indicator (plus sign inside bag) -->
+    <g transform="translate(50, 55)">
+        <!-- Horizontal line -->
+        <line x1="-8" y1="0" x2="8" y2="0" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- Vertical line -->
+        <line x1="0" y1="-8" x2="0" y2="8" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+    
+    <!-- Shine/highlight effect -->
+    <ellipse cx="45" cy="45" rx="12" ry="8" fill="url(#shineGradient)"/>
+    
+    <!-- Decorative dot on handle (quality indicator) -->
+    <circle cx="50" cy="22" r="1.5" fill="#fbbf24" opacity="0.9"/>
+</svg>

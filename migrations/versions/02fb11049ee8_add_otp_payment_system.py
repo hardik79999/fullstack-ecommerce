@@ -1,8 +1,8 @@
-"""Initial migration
+"""add otp payment system
 
-Revision ID: 2a68b125b070
+Revision ID: 02fb11049ee8
 Revises: 
-Create Date: 2026-04-02 14:10:24.807115
+Create Date: 2026-04-03 16:08:06.926781
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '2a68b125b070'
+revision = '02fb11049ee8'
 down_revision = None
 branch_labels = None
 depends_on = None

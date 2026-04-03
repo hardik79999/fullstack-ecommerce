@@ -266,6 +266,8 @@ class OrderItem(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, server_default=db.func.now())
 
+    product = db.relationship('Product', lazy=True)
+
 class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))

@@ -4,49 +4,200 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>E-Commerce Pro - Your Premium Shop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <script>
+        (() => {
+            try {
+                const savedTheme = localStorage.getItem('proshop-theme');
+                document.documentElement.dataset.theme = savedTheme === 'dark' ? 'dark' : 'light';
+            } catch (error) {
+                document.documentElement.dataset.theme = 'light';
+            }
+        })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/storefront.css">
+    <link rel="stylesheet" href="../static/css/app-experience.css">
 </head>
-<body class="bg-gray-50">
+<body class="app-body bg-gray-50">
+    <div class="app-orb app-orb-one" aria-hidden="true"></div>
+    <div class="app-orb app-orb-two" aria-hidden="true"></div>
+    <div class="app-grid" aria-hidden="true"></div>
+
     <!-- Toast Notification Container -->
     <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
 
-    <!-- Navigation Bar -->
-    <nav class="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md">E</div>
-                <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">Pro Shop</h1>
+    <!-- Global Activity Overlay -->
+    <div id="activity-overlay" class="activity-overlay hidden" aria-hidden="true">
+        <div class="activity-backdrop"></div>
+        <div class="activity-dialog">
+            <div class="activity-brand">
+                <div class="activity-brand-mark">E</div>
+                <div>
+                    <p class="activity-brand-title">Pro Shop</p>
+                    <p class="activity-brand-subtitle">Syncing data and notifications</p>
+                </div>
             </div>
+            <div class="activity-spinner"></div>
+            <p id="activity-title" class="activity-title">Working on it</p>
+            <p id="activity-message" class="activity-message">Please wait while we finish your request.</p>
+        </div>
+    </div>
+
+    <div id="page-transition-curtain" class="page-transition-curtain" aria-hidden="true"></div>
+
+    <!-- Navigation Bar -->
+    <nav class="site-nav bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+            <button type="button" class="flex items-center space-x-3 nav-brand nav-brand-button storefront-brand" onclick="reloadAppHome()">
+                <div class="site-logo">
+                    <img src="../static/img/logo.svg" alt="Pro Shop Logo" class="site-logo-svg">
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">Pro Shop</h1>
+                    <p class="nav-subtitle">Premium commerce with layered interactions</p>
+                </div>
+            </button>
             
-            <div class="hidden md:flex items-center space-x-4">
-                <button onclick="navigateTo('#home')" class="nav-link px-4 py-2 rounded hover:bg-gray-100 transition">Home</button>
-                <button id="nav-products" onclick="navigateTo('#products')" class="nav-link px-4 py-2 rounded hover:bg-gray-100 transition" style="display: none;">Products</button>
-                <button id="nav-cart" onclick="navigateTo('#cart')" class="nav-link px-4 py-2 rounded hover:bg-gray-100 transition relative" style="display: none;">
-                    Cart
-                    <span id="cart-badge" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
-                </button>
-                <button id="nav-seller" onclick="navigateTo('#seller-dash')" class="nav-link px-4 py-2 rounded hover:bg-gray-100 transition" style="display: none;">Seller Dashboard</button>
-                <button id="nav-admin" onclick="navigateTo('#admin-dash')" class="nav-link px-4 py-2 rounded hover:bg-gray-100 transition" style="display: none;">Admin Dashboard</button>
-                <button id="nav-profile" onclick="navigateTo('#profile')" class="nav-link px-4 py-2 rounded hover:bg-gray-100 transition" style="display: none;">Profile</button>
-                <button id="nav-logout" onclick="logout()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition" style="display: none;">Logout</button>
-                <button id="nav-login" onclick="navigateTo('#login')" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">Login</button>
+            <div class="hidden md:flex items-center gap-3 nav-actions">
+                <div class="nav-pill-row">
+                    <button onclick="navigateTo('#home')" class="nav-link px-4 py-2 rounded hover:bg-gray-100 transition" data-ripple>Home</button>
+                    <button id="nav-products" onclick="navigateTo('#products')" class="nav-link px-4 py-2 rounded hover:bg-gray-100 transition" style="display: none;" data-ripple>Products</button>
+                    <button id="nav-cart" onclick="navigateTo('#cart')" class="nav-link nav-cart-link px-4 py-2 rounded hover:bg-gray-100 transition relative" style="display: none;" data-ripple>
+                        <span class="nav-cart-content">
+                            <span class="nav-cart-icon-wrap" aria-hidden="true">
+                                <svg class="nav-cart-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 5h2l1.2 6.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.6L20 7H7.1"></path>
+                                    <circle cx="10" cy="18.3" r="1.4"></circle>
+                                    <circle cx="17.2" cy="18.3" r="1.4"></circle>
+                                </svg>
+                                <span id="cart-badge" class="cart-count-badge is-empty" aria-live="polite" aria-atomic="true">0</span>
+                            </span>
+                            <span class="nav-cart-label">Cart</span>
+                        </span>
+                    </button>
+                    <button id="nav-seller" onclick="navigateTo('#seller-dash')" class="nav-link px-4 py-2 rounded hover:bg-gray-100 transition" style="display: none;" data-ripple>Seller Dashboard</button>
+                    <button id="nav-admin" onclick="navigateTo('#admin-dash')" class="nav-link px-4 py-2 rounded hover:bg-gray-100 transition" style="display: none;" data-ripple>Admin Dashboard</button>
+                    <button id="nav-profile" onclick="navigateTo('#profile')" class="nav-link px-4 py-2 rounded hover:bg-gray-100 transition" style="display: none;" data-ripple>Profile</button>
+                </div>
+                <div class="nav-utility-row">
+                    <button id="theme-toggle" type="button" class="theme-toggle-button" onclick="toggleThemeMode()" aria-label="Toggle dark mode" data-ripple>
+                        <span class="theme-toggle-orbit">
+                            <span class="theme-toggle-knob"></span>
+                            <span class="theme-toggle-glyph theme-toggle-glyph-light">L</span>
+                            <span class="theme-toggle-glyph theme-toggle-glyph-dark">D</span>
+                        </span>
+                        <span id="theme-toggle-label" class="theme-toggle-label">Dark Mode</span>
+                    </button>
+                    <div id="nav-role-chip" class="nav-role-chip hidden"></div>
+                    <button id="nav-login" onclick="navigateTo('#login')" class="nav-auth-button nav-auth-button-primary" data-ripple>Login</button>
+                    <button id="nav-logout" onclick="logout()" class="nav-auth-button nav-auth-button-danger" style="display: none;" data-ripple>Logout</button>
+                </div>
             </div>
 
             <!-- Mobile Menu Toggle -->
-            <button class="md:hidden p-2" onclick="toggleMobileMenu()">
+            <button class="md:hidden nav-icon-button" onclick="toggleMobileMenu()" aria-label="Open navigation menu" data-ripple>
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                 </svg>
             </button>
         </div>
+
+        <div id="mobile-menu" class="mobile-menu hidden md:hidden">
+            <div class="max-w-7xl mx-auto px-4 pb-4">
+                <div class="mobile-menu-card">
+                    <div id="mobile-role-chip" class="nav-role-chip hidden"></div>
+                    <div class="mobile-nav-grid">
+                        <button onclick="navigateTo('#home')" class="mobile-nav-link" data-ripple>Home</button>
+                        <button id="mobile-nav-products" onclick="navigateTo('#products')" class="mobile-nav-link" style="display: none;" data-ripple>Products</button>
+                        <button id="mobile-nav-cart" onclick="navigateTo('#cart')" class="mobile-nav-link nav-cart-link" style="display: none;" data-ripple>
+                            <span class="nav-cart-content">
+                                <span class="nav-cart-icon-wrap" aria-hidden="true">
+                                    <svg class="nav-cart-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 5h2l1.2 6.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.6L20 7H7.1"></path>
+                                        <circle cx="10" cy="18.3" r="1.4"></circle>
+                                        <circle cx="17.2" cy="18.3" r="1.4"></circle>
+                                    </svg>
+                                    <span id="mobile-cart-badge" class="cart-count-badge is-empty" aria-live="polite" aria-atomic="true">0</span>
+                                </span>
+                                <span class="nav-cart-label">Cart</span>
+                            </span>
+                        </button>
+                        <button id="mobile-nav-seller" onclick="navigateTo('#seller-dash')" class="mobile-nav-link" style="display: none;" data-ripple>Seller Dashboard</button>
+                        <button id="mobile-nav-admin" onclick="navigateTo('#admin-dash')" class="mobile-nav-link" style="display: none;" data-ripple>Admin Dashboard</button>
+                        <button id="mobile-nav-profile" onclick="navigateTo('#profile')" class="mobile-nav-link" style="display: none;" data-ripple>Profile</button>
+                        <button id="mobile-theme-toggle" type="button" onclick="toggleThemeMode()" class="mobile-nav-link mobile-nav-link-utility" data-ripple>Toggle Dark Mode</button>
+                        <button id="mobile-nav-login" onclick="navigateTo('#login')" class="mobile-nav-link mobile-nav-link-primary" data-ripple>Login</button>
+                        <button id="mobile-nav-logout" onclick="logout()" class="mobile-nav-link mobile-nav-link-danger" style="display: none;" data-ripple>Logout</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </nav>
 
     <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 py-8">
+    <div class="app-shell max-w-7xl mx-auto px-4 py-8">
 
         <!-- Home Page -->
         <section id="home" class="page-section">
+            <div class="hero-panel">
+                <div class="hero-copy">
+                    <p class="section-eyebrow">Storefront that feels premium</p>
+                    <h2 class="text-4xl font-bold text-gray-900 mb-4">A cleaner e-commerce experience for customers, sellers, and admins.</h2>
+                    <p class="text-xl text-gray-600 mb-8">Faster shopping, sharper dashboards, and better order visibility in one place.</p>
+                    <div class="flex gap-4 flex-wrap">
+                        <button id="home-primary-cta" onclick="navigateTo('#products')" class="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-semibold">Browse Products</button>
+                        <button id="home-secondary-cta" onclick="navigateTo('#login')" class="px-8 py-3 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition font-semibold">Get Started</button>
+                    </div>
+                    <div class="hero-stat-row">
+                        <div class="hero-stat-card">
+                            <span class="hero-stat-value">Live</span>
+                            <span class="hero-stat-label">cart sync</span>
+                        </div>
+                        <div class="hero-stat-card">
+                            <span class="hero-stat-value">Role-based</span>
+                            <span class="hero-stat-label">dashboards</span>
+                        </div>
+                        <div class="hero-stat-card">
+                            <span class="hero-stat-value">Tracked</span>
+                            <span class="hero-stat-label">order journey</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-preview">
+                    <div class="hero-preview-card">
+                        <p class="hero-preview-label">Operations view</p>
+                        <h3>Everything important stays visible.</h3>
+                        <ul class="hero-check-list">
+                            <li>Customer orders and addresses only where they belong</li>
+                            <li>Seller and admin dashboards with cleaner actions</li>
+                            <li>Processing overlay for payments, updates, and submissions</li>
+                        </ul>
+                    </div>
+                    <div class="hero-preview-grid">
+                        <div class="hero-mini-card">
+                            <p class="hero-mini-title">Fast Delivery</p>
+                            <p class="hero-mini-text">Quick shipment updates with live progress.</p>
+                        </div>
+                        <div class="hero-mini-card">
+                            <p class="hero-mini-title">Secure Checkout</p>
+                            <p class="hero-mini-text">Smooth payment flow with clearer status feedback.</p>
+                        </div>
+                        <div class="hero-mini-card">
+                            <p class="hero-mini-title">Admin Control</p>
+                            <p class="hero-mini-text">Requests, sellers, and orders arranged in one place.</p>
+                        </div>
+                        <div class="hero-mini-card">
+                            <p class="hero-mini-title">Sharp UI</p>
+                            <p class="hero-mini-text">Better spacing, stronger cards, cleaner navigation.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="text-center mb-12">
                 <h2 class="text-4xl font-bold text-gray-900 mb-4">Welcome to E-Commerce Pro</h2>
                 <p class="text-xl text-gray-600 mb-8">Premium products at unbeatable prices</p>
@@ -77,7 +228,7 @@
 
         <!-- Login/Signup Page -->
         <section id="login" class="page-section hidden">
-            <div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-lg">
+            <div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-lg surface-card">
                 <h2 class="text-3xl font-bold text-gray-900 mb-6">Welcome Back</h2>
                 
                 <div class="flex gap-2 mb-6">
@@ -127,80 +278,384 @@
 
         <!-- Products Page -->
         <section id="products" class="page-section hidden">
-            <div class="mb-8">
-                <h2 class="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent mb-2">Discover Products</h2>
-                <p class="text-gray-600 mb-6">Handpicked items just for you</p>
-                <div class="flex gap-3 mb-6 flex-wrap">
-                    <input type="text" id="search-products" placeholder="🔍 Search products by name..." class="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" onkeyup="filterProducts()">
-                    <button onclick="loadProducts()" class="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition font-semibold shadow-md">Refresh</button>
+            <div class="storefront-hero-panel surface-card">
+                <div class="storefront-hero-copy">
+                    <p class="section-eyebrow storefront-eyebrow">Curated Product Stories</p>
+                    <h2 class="storefront-headline">Designed like a premium storefront, filtered like a pro catalog.</h2>
+                    <p class="storefront-subtitle">Explore polished product cards, fluid interactions, saved favorites, and a detail view that shifts its atmosphere to match the product itself.</p>
+                    <div class="storefront-search-row">
+                        <label class="storefront-search-shell" for="search-products">
+                            <span class="storefront-search-label">Search</span>
+                            <input type="text" id="search-products" placeholder="Search products, categories, or seller names" class="storefront-search-input" oninput="filterProducts()">
+                        </label>
+                        <button onclick="loadProducts(true)" class="storefront-refresh-btn" data-ripple>Refresh Catalog</button>
+                    </div>
+                </div>
+                <div class="storefront-hero-metrics">
+                    <div class="storefront-metric-card">
+                        <span class="storefront-metric-label">Layout</span>
+                        <strong>Adaptive Grid</strong>
+                        <p>Three to four columns on desktop, compact on mobile.</p>
+                    </div>
+                    <div class="storefront-metric-card">
+                        <span class="storefront-metric-label">Motion</span>
+                        <strong>Micro-interactions</strong>
+                        <p>Ripple clicks, hover glow, image zoom, and ambient transitions.</p>
+                    </div>
+                    <div class="storefront-metric-card">
+                        <span class="storefront-metric-label">Atmosphere</span>
+                        <strong>Dynamic Backgrounds</strong>
+                        <p>Detail pages inherit a gradient inspired by the product image.</p>
+                    </div>
                 </div>
             </div>
 
-            <div id="products-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="bg-white p-6 rounded-xl shadow-sm text-center text-gray-500">
-                    <p>Loading products...</p>
+            <div class="storefront-layout">
+                <aside class="storefront-sidebar surface-card">
+                    <div class="storefront-filter-block">
+                        <div class="storefront-filter-heading">
+                            <div>
+                                <p class="storefront-filter-label">Sidebar Filters</p>
+                                <h3>Refine the collection</h3>
+                            </div>
+                            <button type="button" class="storefront-clear-link" onclick="resetStorefrontFilters()" data-ripple>Reset</button>
+                        </div>
+                    </div>
+
+                    <div class="storefront-filter-block">
+                        <p class="storefront-filter-title">Categories</p>
+                        <div id="category-filter-list" class="storefront-category-list">
+                            <button type="button" class="storefront-category-chip active" onclick="filterByCategory('all', this)" data-ripple>All Products</button>
+                        </div>
+                    </div>
+
+                    <div class="storefront-filter-block">
+                        <div class="storefront-range-header">
+                            <p class="storefront-filter-title">Price Range</p>
+                            <span id="price-range-label" class="storefront-range-value">Any price</span>
+                        </div>
+                        <input type="range" id="price-range" class="storefront-range-input" min="0" max="50000" step="100" value="50000" oninput="handlePriceRangeChange(event)">
+                        <div class="storefront-range-scale">
+                            <span id="price-range-min">Rs.0</span>
+                            <span id="price-range-max">Rs.50000</span>
+                        </div>
+                    </div>
+
+                    <div class="storefront-filter-block">
+                        <label class="storefront-toggle-row">
+                            <input type="checkbox" id="filter-in-stock" onchange="filterProducts()">
+                            <span>Only show items in stock</span>
+                        </label>
+                        <label class="storefront-toggle-row">
+                            <input type="checkbox" id="filter-favorites" onchange="filterProducts()">
+                            <span>Show wishlist only</span>
+                        </label>
+                    </div>
+
+                    <div class="storefront-filter-block storefront-sidebar-note">
+                        <p class="storefront-filter-title">Experience Notes</p>
+                        <p>Cards support direct cart actions, wishlist saves, soft glass layers, and smooth skeleton loading while the catalog is fetching.</p>
+                    </div>
+                </aside>
+
+                <div class="storefront-results">
+                    <div class="storefront-toolbar surface-card">
+                        <div>
+                            <p class="storefront-toolbar-label">Live Results</p>
+                            <h3 id="products-results-count" class="storefront-toolbar-title">Loading collection...</h3>
+                        </div>
+                        <div class="storefront-toolbar-actions">
+                            <button id="wishlist-filter-toggle" type="button" class="storefront-toolbar-button" onclick="toggleWishlistView(this)" data-ripple>Wishlist View</button>
+                            <button type="button" class="storefront-toolbar-button storefront-toolbar-button-primary" onclick="loadProducts(true)" data-ripple>Reload</button>
+                        </div>
+                    </div>
+
+                    <div id="products-grid" class="products-grid">
+                        <div class="storefront-empty-shell">
+                            <p>Loading premium catalog...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
 
         <!-- Product Detail Page -->
         <section id="product-detail" class="page-section hidden">
+            <div class="product-detail-shell">
+                <div class="product-detail-topbar">
+                    <button onclick="navigateTo('#products')" class="detail-back-button" data-ripple>Back to Collection</button>
+                    <button id="detail-wishlist-toggle" type="button" class="detail-wishlist-toggle" onclick="toggleDetailWishlist()" data-ripple>Save to Wishlist</button>
+                </div>
+                
+                <div class="product-detail-main surface-card">
+                    <div class="product-detail-media">
+                        <div id="detail-image-stage" class="detail-image-stage">
+                            <div class="detail-image-overlay">
+                                <span id="detail-discount-badge" class="detail-discount-badge hidden"></span>
+                                <span id="detail-gallery-status" class="detail-gallery-status" aria-live="polite">1 / 1</span>
+                            </div>
+                            <img id="detail-primary-image" src="" alt="Product" class="detail-primary-image">
+                        </div>
+                        <div id="detail-images-grid" class="detail-thumbnail-grid"></div>
+                    </div>
+
+                    <div class="product-detail-content">
+                        <div class="detail-topline">
+                            <div class="detail-meta-pill-group">
+                                <span id="detail-category-pill" class="detail-meta-pill">Category</span>
+                                <span id="detail-stock" class="detail-meta-pill detail-stock-pill">Stock</span>
+                            </div>
+                            <div class="detail-rating-badge">
+                                <span class="detail-rating-stars">4.8</span>
+                                <span id="detail-rating-copy">Premium pick</span>
+                            </div>
+                        </div>
+
+                        <div class="detail-header-copy">
+                            <h2 id="detail-name" class="detail-product-name"></h2>
+                            <p id="detail-description" class="detail-description"></p>
+                        </div>
+
+                        <div class="detail-pricing-row">
+                            <div class="detail-price-stack">
+                                <span id="detail-price" class="detail-price"></span>
+                                <span id="detail-original-price" class="detail-original-price hidden"></span>
+                            </div>
+                            <p id="detail-info" class="detail-supporting-copy"></p>
+                        </div>
+
+                        <div id="detail-variant-panel" class="detail-variant-panel hidden">
+                            <div id="detail-colour-group" class="detail-variant-group hidden">
+                                <div class="detail-variant-heading">
+                                    <div>
+                                        <p class="detail-variant-label">Colour</p>
+                                        <strong id="detail-colour-value" class="detail-variant-value">Selected look</strong>
+                                    </div>
+                                </div>
+                                <div id="detail-colour-swatches" class="detail-colour-swatches"></div>
+                            </div>
+
+                            <div id="detail-size-group" class="detail-variant-group hidden">
+                                <div class="detail-variant-heading detail-variant-heading-inline">
+                                    <div>
+                                        <p class="detail-variant-label">Size</p>
+                                        <strong id="detail-size-value" class="detail-variant-value">Select your size</strong>
+                                    </div>
+                                    <button id="detail-size-guide-trigger" type="button" class="detail-size-guide-link" onclick="toggleDetailSizeGuide()" data-ripple>
+                                        Size Guide
+                                    </button>
+                                </div>
+                                <div id="detail-size-grid" class="detail-size-grid"></div>
+                                <div id="detail-size-guide-panel" class="detail-size-guide-panel hidden"></div>
+                            </div>
+                        </div>
+
+                        <div id="detail-specs" class="detail-spec-grid"></div>
+
+                        <div class="detail-action-panel">
+                            <label class="detail-quantity-field">
+                                <span>Quantity</span>
+                                <input type="number" id="detail-quantity" min="1" value="1" class="detail-quantity-input">
+                            </label>
+                            <div class="detail-action-row">
+                                <button id="add-to-cart-btn" onclick="addToCart()" class="detail-action-button detail-action-button-primary flex items-center justify-center gap-2" data-ripple>
+                                    <span data-add-to-cart-spinner class="hidden w-4 h-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin"></span>
+                                    <span data-add-to-cart-label>Add to Cart</span>
+                                </button>
+                                <button id="buy-now-btn" type="button" onclick="buyNowFromDetail()" class="detail-action-button detail-action-button-secondary" data-ripple>Buy Now</button>
+                            </div>
+                            <p id="detail-selection-message" class="detail-selection-message hidden" aria-live="polite"></p>
+                        </div>
+
+                        <div id="detail-highlights" class="detail-highlight-row"></div>
+                    </div>
+                </div>
+
+                <div class="product-detail-secondary">
+                    <div class="detail-secondary-card surface-card">
+                        <div class="detail-secondary-heading">
+                            <p class="section-eyebrow storefront-eyebrow">Gallery Details</p>
+                            <h3>Visual detail and seller context</h3>
+                        </div>
+                        <div id="detail-seller-meta" class="detail-seller-meta"></div>
+                    </div>
+                    <div class="detail-secondary-card surface-card">
+                        <div class="detail-secondary-heading">
+                            <p class="section-eyebrow storefront-eyebrow">Reviews</p>
+                            <h3>Customer sentiment preview</h3>
+                        </div>
+                        <div id="detail-reviews" class="detail-review-list"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Legacy Products Page -->
+        <section id="products-legacy" class="page-section hidden legacy-storefront-shell" aria-hidden="true">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent mb-2">Discover Products</h2>
+                <p class="text-gray-600 mb-6">Handpicked items just for you</p>
+                
+                <!-- Category Filters -->
+                <div class="mb-6 pb-4 border-b border-gray-200">
+                    <p class="text-sm font-semibold text-gray-700 mb-3">Filter by Category</p>
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="filterByCategory('all')" class="category-filter-btn active px-4 py-2 rounded-full border-2 border-blue-600 bg-blue-600 text-white font-semibold transition-all duration-200 hover:shadow-md">All Products</button>
+                        <button onclick="filterByCategory('electronics')" class="category-filter-btn px-4 py-2 rounded-full border-2 border-gray-300 bg-white text-gray-700 font-semibold transition-all duration-200 hover:border-gray-400">📱 Electronics</button>
+                        <button onclick="filterByCategory('clothing')" class="category-filter-btn px-4 py-2 rounded-full border-2 border-gray-300 bg-white text-gray-700 font-semibold transition-all duration-200 hover:border-gray-400">👔 Clothing</button>
+                        <button onclick="filterByCategory('computers')" class="category-filter-btn px-4 py-2 rounded-full border-2 border-gray-300 bg-white text-gray-700 font-semibold transition-all duration-200 hover:border-gray-400">💻 Computers</button>
+                        <button onclick="filterByCategory('fashion')" class="category-filter-btn px-4 py-2 rounded-full border-2 border-gray-300 bg-white text-gray-700 font-semibold transition-all duration-200 hover:border-gray-400">✨ Fashion</button>
+                        <button onclick="filterByCategory('gadgets')" class="category-filter-btn px-4 py-2 rounded-full border-2 border-gray-300 bg-white text-gray-700 font-semibold transition-all duration-200 hover:border-gray-400">🎧 Gadgets</button>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 mb-6 flex-wrap">
+                    <input type="text" id="search-products-legacy" placeholder="Search products by name" class="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" onkeyup="filterProducts()">
+                    <button onclick="loadProducts()" class="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition font-semibold shadow-md">Refresh</button>
+                </div>
+            </div>
+
+            <div id="products-grid-legacy" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm text-center text-gray-500">
+                    <p>Loading products...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Legacy Product Detail Page -->
+        <section id="product-detail-legacy-shell" class="page-section hidden legacy-storefront-shell" aria-hidden="true">
             <button onclick="navigateTo('#products')" class="mb-6 px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition">← Back to Products</button>
             
-            <div class="bg-white rounded-lg shadow-lg p-8">
+            <div class="bg-white rounded-lg shadow-lg p-8 surface-card">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
-                        <img id="detail-primary-image" src="" alt="Product" class="w-full rounded-lg mb-4 object-cover max-h-96">
-                        <div id="detail-images-grid" class="grid grid-cols-4 gap-2"></div>
+                        <img id="detail-primary-image-legacy" src="" alt="Product" class="w-full rounded-lg mb-4 object-cover max-h-96">
+                        <div id="detail-images-grid-legacy" class="grid grid-cols-4 gap-2"></div>
                     </div>
                     <div>
-                        <h2 id="detail-name" class="text-3xl font-bold text-gray-900 mb-2"></h2>
-                        <p id="detail-description" class="text-gray-600 mb-4"></p>
+                        <h2 id="detail-name-legacy" class="text-3xl font-bold text-gray-900 mb-2"></h2>
+                        <p id="detail-description-legacy" class="text-gray-600 mb-4"></p>
                         <div class="mb-4">
-                            <span class="text-3xl font-bold text-blue-600" id="detail-price"></span>
-                            <span class="ml-4 text-lg text-gray-500" id="detail-stock"></span>
+                            <span class="text-3xl font-bold text-blue-600" id="detail-price-legacy"></span>
+                            <span class="ml-4 text-lg text-gray-500" id="detail-stock-legacy"></span>
                         </div>
-                        <div id="detail-specs" class="mb-6 bg-gray-50 p-4 rounded-lg"></div>
+                        <div id="detail-specs-legacy" class="mb-6 bg-gray-50 p-4 rounded-lg"></div>
                         <div class="flex gap-4 mb-6">
-                            <input type="number" id="detail-quantity" min="1" value="1" class="w-20 px-3 py-2 border border-gray-300 rounded-lg">
-                            <button onclick="addToCart()" class="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-semibold">Add to Cart</button>
+                            <input type="number" id="detail-quantity-legacy" min="1" value="1" class="w-20 px-3 py-2 border border-gray-300 rounded-lg">
+                            <button id="add-to-cart-btn-legacy" onclick="addToCart()" class="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-semibold flex items-center justify-center gap-2">
+                                <span data-add-to-cart-spinner class="hidden w-4 h-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin"></span>
+                                <span data-add-to-cart-label>Add to Cart</span>
+                            </button>
                         </div>
-                        <div id="detail-info" class="text-sm text-gray-500"></div>
+                        <div id="detail-info-legacy" class="text-sm text-gray-500"></div>
                     </div>
                 </div>
             </div>
         </section>
 
         <!-- Cart Page -->
-        <section id="cart" class="page-section hidden">
-            <h2 class="text-3xl font-bold text-gray-900 mb-6">Shopping Cart</h2>
-            
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2">
-                    <div id="cart-items" class="bg-white rounded-lg shadow">
-                        <div class="p-8 text-center text-gray-500">
-                            <p>Your cart is empty</p>
-                            <button onclick="navigateTo('#products')" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">Continue Shopping</button>
+        <section id="cart" class="page-section hidden commerce-page">
+            <div class="page-intro page-intro-compact">
+                <div>
+                    <p class="section-eyebrow storefront-eyebrow">Refined Cart Flow</p>
+                    <h2 class="text-4xl font-bold text-gray-900">Shopping Cart</h2>
+                    <p class="page-intro-copy">Review items, tune quantities, and move into checkout with a cleaner premium flow.</p>
+                </div>
+            </div>
+
+            <div class="cart-layout">
+                <div class="cart-main-column">
+                    <div id="cart-items" class="cart-items-panel surface-card">
+                        <div class="cart-empty-state">
+                            <div class="cart-empty-visual" aria-hidden="true">Cart</div>
+                            <h3>Your cart is empty</h3>
+                            <p>Add a few products and they will appear here with live totals.</p>
+                            <button onclick="navigateTo('#products')" class="cart-secondary-cta" data-ripple>Continue Shopping</button>
+                        </div>
+                    </div>
+                </div>
+
+                <aside class="cart-summary-panel surface-card">
+                    <div class="cart-summary-header">
+                        <div>
+                            <p class="section-eyebrow storefront-eyebrow">Order Snapshot</p>
+                            <h3 class="text-2xl font-bold text-gray-900">Summary</h3>
+                        </div>
+                        <span id="cart-summary-badge" class="cart-summary-badge">0 items</span>
+                    </div>
+
+                    <div class="cart-summary-stats">
+                        <div class="cart-summary-stat">
+                            <span>Items</span>
+                            <strong id="cart-item-count">0</strong>
+                        </div>
+                        <div class="cart-summary-stat">
+                            <span>Delivery</span>
+                            <strong id="cart-delivery-note">Calculated live</strong>
+                        </div>
+                    </div>
+
+                    <div class="cart-summary-breakdown">
+                        <div class="cart-summary-line">
+                            <span class="text-gray-600">Subtotal</span>
+                            <strong id="cart-subtotal">Rs.0.00</strong>
+                        </div>
+                        <div class="cart-summary-line">
+                            <span class="text-gray-600">Shipping</span>
+                            <strong id="cart-shipping">Rs.0.00</strong>
+                        </div>
+                    </div>
+
+                    <div class="cart-total-row">
+                        <span>Total</span>
+                        <strong id="cart-total" class="text-blue-600">Rs.0.00</strong>
+                    </div>
+
+                    <div class="cart-summary-actions">
+                        <button id="cart-checkout-cta" onclick="proceedToCheckout()" class="cart-primary-cta" data-ripple>Proceed to Checkout</button>
+                        <button id="cart-continue-cta" onclick="navigateTo('#products')" class="cart-secondary-cta" data-ripple>Continue Shopping</button>
+                    </div>
+                </aside>
+            </div>
+        </section>
+
+        <section id="cart-legacy-shell" class="page-section hidden commerce-page legacy-commerce-shell" aria-hidden="true">
+            <div class="page-intro page-intro-compact">
+                <div>
+                    <p class="section-eyebrow storefront-eyebrow">Refined Cart Flow</p>
+                    <h2 class="text-4xl font-bold text-gray-900">Shopping Cart</h2>
+                    <p class="page-intro-copy">Review items, tune quantities, and move into checkout with a cleaner premium flow.</p>
+                </div>
+            </div>
+
+            <div class="cart-layout">
+                <div class="cart-main-column">
+                    <div id="cart-items-legacy" class="cart-items-panel surface-card">
+                        <div class="cart-empty-state">
+                            <div class="cart-empty-visual" aria-hidden="true">Cart</div>
+                            <h3>Your cart is empty</h3>
+                            <p>Add a few products and they will appear here with live totals.</p>
+                            <button onclick="navigateTo('#products')" class="cart-secondary-cta" data-ripple>Continue Shopping</button>
                         </div>
                     </div>
                 </div>
                 
                 <div class="lg:col-span-1">
-                    <div class="bg-white rounded-lg shadow p-6 sticky top-20">
+                    <div class="bg-white rounded-lg shadow p-6 sticky top-20 surface-card">
                         <h3 class="text-xl font-bold text-gray-900 mb-4">Order Summary</h3>
                         <div class="space-y-2 mb-4 pb-4 border-b">
                             <div class="flex justify-between">
                                 <span class="text-gray-600">Subtotal:</span>
-                                <span id="cart-subtotal" class="font-semibold">₹0</span>
+                                <span id="cart-subtotal-legacy" class="font-semibold">₹0</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-600">Shipping:</span>
-                                <span id="cart-shipping" class="font-semibold">₹0</span>
+                                <span id="cart-shipping-legacy" class="font-semibold">₹0</span>
                             </div>
                         </div>
                         <div class="flex justify-between mb-6 text-lg font-bold">
                             <span>Total:</span>
-                            <span id="cart-total" class="text-blue-600">₹0</span>
+                            <span id="cart-total-legacy" class="text-blue-600">₹0</span>
                         </div>
                         <button onclick="proceedToCheckout()" class="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-semibold">Proceed to Checkout</button>
                         <button onclick="navigateTo('#products')" class="w-full mt-2 px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition">Continue Shopping</button>
@@ -210,7 +665,124 @@
         </section>
 
         <!-- Checkout Page -->
-        <section id="checkout" class="page-section hidden">
+        <section id="checkout" class="page-section hidden commerce-page">
+            <div class="page-intro page-intro-compact">
+                <div>
+                    <p class="section-eyebrow storefront-eyebrow">Guided Checkout</p>
+                    <h2 class="text-4xl font-bold text-gray-900">Checkout</h2>
+                    <p class="page-intro-copy">Select an address, confirm payment, and review your order from a polished two-column layout.</p>
+                </div>
+            </div>
+
+            <div class="checkout-layout">
+                <div class="checkout-main-column">
+                    <div class="checkout-card surface-card">
+                        <div class="checkout-section-heading checkout-section-heading-address">
+                            <div>
+                                <p class="section-eyebrow storefront-eyebrow">Delivery Step</p>
+                                <h3 class="text-2xl font-bold text-gray-900">Shipping Address</h3>
+                            </div>
+                            <div class="checkout-address-header-actions">
+                                <span class="checkout-helper-copy">Saved addresses turn into clear selectable cards the moment they load.</span>
+                                <button id="checkout-add-address-trigger" type="button" class="checkout-address-add-button" onclick="beginAddressCreate()" data-ripple>
+                                    <span class="checkout-address-add-button-icon" aria-hidden="true">+</span>
+                                    <span>Add New Address</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="saved-addresses" class="checkout-address-list"></div>
+
+                        <div id="add-new-address-section" class="checkout-address-form-card">
+                            <div class="checkout-address-form-header">
+                                <div>
+                                    <h4 id="address-form-title" class="font-semibold text-gray-900">Add New Address</h4>
+                                    <p id="address-form-copy" class="checkout-helper-copy">Store another destination for future orders.</p>
+                                </div>
+                                <button id="address-form-cancel" type="button" class="checkout-address-form-cancel hidden" onclick="beginAddressCreate()">Cancel</button>
+                            </div>
+                            <form id="address-form" onsubmit="handleAddAddress(event)" class="space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <input type="text" id="addr-name" placeholder="Full Name" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <input type="tel" id="addr-phone" placeholder="Phone Number" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <input type="text" id="addr-street" placeholder="Street Address" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <input type="text" id="addr-city" placeholder="City" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <input type="text" id="addr-state" placeholder="State" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <input type="text" id="addr-pincode" placeholder="Pincode" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div class="checkout-address-form-actions">
+                                    <button id="address-form-submit" type="submit" class="cart-primary-cta" data-ripple>Save Address</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div id="payment-section" class="checkout-card surface-card hidden">
+                        <div class="checkout-section-heading">
+                            <div>
+                                <p class="section-eyebrow storefront-eyebrow">Payment Step</p>
+                                <h3 class="text-2xl font-bold text-gray-900">Payment Method</h3>
+                            </div>
+                            <span class="checkout-helper-copy">Pick a secure payment path and place the order.</span>
+                        </div>
+
+                        <form id="payment-form" onsubmit="handlePayment(event)">
+                            <div class="payment-option-grid mb-6">
+                                <label class="payment-option-card is-selected">
+                                    <input type="radio" name="payment_method" value="cod" checked class="payment-option-input">
+                                    <span class="payment-option-badge">Most Flexible</span>
+                                    <span class="payment-option-title">Cash on Delivery</span>
+                                    <span class="payment-option-copy">Pay when the package reaches your doorstep.</span>
+                                </label>
+                                <label class="payment-option-card">
+                                    <input type="radio" name="payment_method" value="card" class="payment-option-input">
+                                    <span class="payment-option-badge">Fast</span>
+                                    <span class="payment-option-title">Credit or Debit Card</span>
+                                    <span class="payment-option-copy">Use your saved card flow or enter card details at payment time.</span>
+                                </label>
+                                <label class="payment-option-card">
+                                    <input type="radio" name="payment_method" value="upi" class="payment-option-input">
+                                    <span class="payment-option-badge">Instant</span>
+                                    <span class="payment-option-title">UPI</span>
+                                    <span class="payment-option-copy">Approve the purchase from your favorite UPI app.</span>
+                                </label>
+                                <label class="payment-option-card">
+                                    <input type="radio" name="payment_method" value="netbanking" class="payment-option-input">
+                                    <span class="payment-option-badge">Protected</span>
+                                    <span class="payment-option-title">Netbanking</span>
+                                    <span class="payment-option-copy">Confirm the transaction with a secure OTP verification step.</span>
+                                </label>
+                            </div>
+                            <div id="payment-method-note" class="payment-method-note">
+                                <strong id="payment-method-note-title">Cash on Delivery stays instant</strong>
+                                <p id="payment-method-note-copy">COD places the order immediately. Card, UPI, and Netbanking now require a 6-digit email OTP before payment is completed.</p>
+                            </div>
+                            <button type="submit" class="cart-primary-cta" data-ripple>Complete Purchase</button>
+                        </form>
+                    </div>
+                </div>
+
+                <aside class="checkout-summary-panel surface-card">
+                    <div class="checkout-section-heading checkout-section-heading-inline">
+                        <div>
+                            <p class="section-eyebrow storefront-eyebrow">Live Summary</p>
+                            <h3 class="text-2xl font-bold text-gray-900">Order Review</h3>
+                        </div>
+                    </div>
+                    <div id="checkout-summary" class="checkout-summary-list">
+                        <div class="text-gray-500">Loading...</div>
+                    </div>
+                    <div class="cart-total-row checkout-total-row">
+                        <span>Total</span>
+                        <strong id="checkout-total" class="text-blue-600">Rs.0.00</strong>
+                    </div>
+                </aside>
+            </div>
+        </section>
+
+        <section id="checkout-legacy-shell" class="page-section hidden legacy-commerce-shell" aria-hidden="true">
             <h2 class="text-3xl font-bold text-gray-900 mb-6">Checkout</h2>
             
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -219,20 +791,20 @@
                     <div class="bg-white rounded-lg shadow p-6 mb-6">
                         <h3 class="text-xl font-bold text-gray-900 mb-4">Shipping Address</h3>
                         
-                        <div id="saved-addresses" class="mb-6"></div>
+                        <div id="saved-addresses-legacy" class="mb-6"></div>
                         
-                        <div class="bg-gray-50 p-4 rounded-lg">
+                        <div id="add-new-address-section-legacy" class="bg-gray-50 p-4 rounded-lg">
                             <h4 class="font-semibold text-gray-900 mb-4">Add New Address</h4>
                             <form onsubmit="handleAddAddress(event)">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                    <input type="text" id="addr-name" placeholder="Full Name" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <input type="tel" id="addr-phone" placeholder="Phone Number" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <input type="text" id="addr-name-legacy" placeholder="Full Name" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <input type="tel" id="addr-phone-legacy" placeholder="Phone Number" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 </div>
-                                <input type="text" id="addr-street" placeholder="Street Address" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
+                                <input type="text" id="addr-street-legacy" placeholder="Street Address" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                    <input type="text" id="addr-city" placeholder="City" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <input type="text" id="addr-state" placeholder="State" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <input type="text" id="addr-pincode" placeholder="Pincode" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <input type="text" id="addr-city-legacy" placeholder="City" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <input type="text" id="addr-state-legacy" placeholder="State" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <input type="text" id="addr-pincode-legacy" placeholder="Pincode" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 </div>
                                 <button type="submit" class="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-semibold">Save Address & Continue</button>
                             </form>
@@ -240,7 +812,7 @@
                     </div>
 
                     <!-- Payment Method Section (shown after address selection) -->
-                    <div id="payment-section" class="bg-white rounded-lg shadow p-6 hidden">
+                    <div id="payment-section-legacy" class="bg-white rounded-lg shadow p-6 hidden surface-card">
                         <h3 class="text-xl font-bold text-gray-900 mb-4">Payment Method</h3>
                         <form onsubmit="handlePayment(event)">
                             <div class="space-y-3 mb-6">
@@ -264,14 +836,14 @@
 
                 <!-- Order Summary -->
                 <div class="lg:col-span-1">
-                    <div class="bg-white rounded-lg shadow p-6 sticky top-20">
+                    <div class="bg-white rounded-lg shadow p-6 sticky top-20 surface-card">
                         <h3 class="text-xl font-bold text-gray-900 mb-4">Order Summary</h3>
-                        <div id="checkout-summary" class="space-y-2 mb-4 pb-4 border-b">
+                        <div id="checkout-summary-legacy" class="space-y-2 mb-4 pb-4 border-b">
                             <div class="text-gray-500">Loading...</div>
                         </div>
                         <div class="flex justify-between text-lg font-bold">
                             <span>Total:</span>
-                            <span id="checkout-total" class="text-blue-600">₹0</span>
+                            <span id="checkout-total-legacy" class="text-blue-600">₹0</span>
                         </div>
                     </div>
                 </div>
@@ -282,8 +854,15 @@
         <section id="order-tracking" class="page-section hidden">
             <button onclick="navigateTo('#profile')" class="mb-6 px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition">← Back to Profile</button>
             
-            <div class="bg-white rounded-lg shadow-lg p-8">
-                <h2 id="tracking-order-id" class="text-3xl font-bold text-gray-900 mb-8">Order Tracking</h2>
+            <div class="bg-white rounded-lg shadow-lg p-8 surface-card tracking-shell">
+                <div class="flex flex-col gap-2 mb-8">
+                    <h2 id="tracking-order-id" class="text-3xl font-bold text-gray-900">Order Tracking</h2>
+                    <p id="tracking-status-text" class="text-gray-600">Live delivery updates will appear here.</p>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <div id="tracking-summary" class="lg:col-span-2 bg-gray-50 border border-gray-200 rounded-xl p-5"></div>
+                    <div id="tracking-shipping" class="bg-blue-50 border border-blue-100 rounded-xl p-5"></div>
+                </div>
                 <div id="tracking-timeline" class="space-y-6"></div>
             </div>
         </section>
@@ -291,6 +870,7 @@
         <!-- User Profile Page -->
         <section id="profile" class="page-section hidden">
             <h2 class="text-3xl font-bold text-gray-900 mb-6">My Profile</h2>
+            <p id="profile-subtitle" class="text-gray-600 mb-6">Manage your account and activity.</p>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <!-- Profile Info -->
@@ -314,7 +894,7 @@
                     </div>
 
                     <!-- My Orders -->
-                    <div class="bg-white rounded-lg shadow p-6">
+                    <div id="profile-orders-card" class="bg-white rounded-lg shadow p-6 surface-card">
                         <h3 class="text-xl font-bold text-gray-900 mb-4">My Orders</h3>
                         <div id="profile-orders" class="space-y-3"></div>
                     </div>
@@ -322,7 +902,11 @@
 
                 <!-- Saved Addresses -->
                 <div>
-                    <div class="bg-white rounded-lg shadow p-6">
+                    <div id="profile-role-panel" class="bg-white rounded-lg shadow p-6 mb-6 hidden surface-card">
+                        <h3 id="profile-role-panel-title" class="text-xl font-bold text-gray-900 mb-4">Role Overview</h3>
+                        <div id="profile-role-panel-body" class="space-y-3 text-sm text-gray-700"></div>
+                    </div>
+                    <div id="profile-addresses-card" class="bg-white rounded-lg shadow p-6 surface-card">
                         <h3 class="text-xl font-bold text-gray-900 mb-4">Saved Addresses</h3>
                         <div id="profile-addresses" class="space-y-3"></div>
                     </div>
@@ -332,31 +916,51 @@
 
         <!-- Seller Dashboard -->
         <section id="seller-dash" class="page-section hidden">
-            <h2 class="text-3xl font-bold text-gray-900 mb-6">Seller Dashboard</h2>
+            <div class="seller-dash-hero mb-6">
+                <div>
+                    <p class="section-eyebrow seller-eyebrow">Seller Command Deck</p>
+                    <h2 class="text-4xl font-bold text-gray-900">Seller Dashboard</h2>
+                    <p class="seller-dash-subtitle mt-3">Shape your catalog, track category access, and keep every listing looking sharp from one premium workspace.</p>
+                </div>
+                <div class="seller-dash-glance">
+                    <span>Live inventory</span>
+                    <span>Fast edits</span>
+                    <span>Clean control</span>
+                </div>
+            </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 seller-metric-grid">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow metric-card metric-card-blue">
                     <div class="text-3xl font-bold" id="seller-products-count">0</div>
                     <p class="text-sm opacity-90">Active Products</p>
                 </div>
-                <div class="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-lg shadow">
+                <div class="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-lg shadow metric-card metric-card-green">
                     <div class="text-3xl font-bold" id="seller-categories-count">0</div>
                     <p class="text-sm opacity-90">Categories</p>
                 </div>
-                <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-lg shadow">
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-lg shadow metric-card metric-card-purple">
                     <div class="text-3xl font-bold" id="seller-pending-count">0</div>
                     <p class="text-sm opacity-90">Pending Requests</p>
                 </div>
-                <div class="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-6 rounded-lg shadow">
+                <div class="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-6 rounded-lg shadow metric-card metric-card-orange">
                     <div class="text-3xl font-bold" id="seller-approved-count">0</div>
                     <p class="text-sm opacity-90">Approved Categories</p>
                 </div>
             </div>
 
             <!-- Add Product Form -->
-            <div class="bg-white rounded-lg shadow p-6 mb-8">
-                <h3 class="text-2xl font-bold text-gray-900 mb-4">Add New Product</h3>
+            <div class="bg-white rounded-lg shadow p-6 mb-8 surface-card">
+                <div class="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h3 id="seller-product-form-title" class="text-2xl font-bold text-gray-900">Add New Product</h3>
+                        <p id="seller-product-form-status" class="text-sm text-gray-500 mt-1">Create a fresh listing with images, stock, and specifications.</p>
+                    </div>
+                    <button id="seller-product-cancel-edit" type="button" onclick="resetSellerProductForm()" class="hidden px-4 py-2 bg-gray-200 text-gray-900 rounded-xl hover:bg-gray-300 transition font-semibold">
+                        Cancel Edit
+                    </button>
+                </div>
                 <form onsubmit="handleAddProduct(event)" enctype="multipart/form-data" id="seller-product-form">
+                    <input type="hidden" id="product-edit-uuid" value="">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <input type="text" id="product-name" placeholder="Product Name" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <select id="product-category" required class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -374,7 +978,7 @@
                     <div class="mb-4">
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Product Images</label>
                         <input type="file" id="product-images" multiple accept="image/*" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <p class="text-sm text-gray-500 mt-1">First image will be set as primary</p>
+                        <p id="product-images-help" class="text-sm text-gray-500 mt-1">First image will be set as primary</p>
                     </div>
 
                     <div class="mb-6">
@@ -389,13 +993,25 @@
                         <button type="button" onclick="addSpec()" class="mt-2 px-4 py-2 bg-gray-300 text-gray-900 rounded-lg hover:bg-gray-400 transition">Add Specification</button>
                     </div>
 
-                    <button type="submit" class="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-semibold">Add Product</button>
+                    <div class="flex flex-col gap-3 md:flex-row">
+                        <button id="seller-product-submit" type="submit" class="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-semibold">Add Product</button>
+                        <button id="seller-product-secondary" type="button" onclick="resetSellerProductForm()" class="hidden w-full px-4 py-3 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition font-semibold">Reset</button>
+                    </div>
                 </form>
             </div>
 
             <!-- My Products -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-2xl font-bold text-gray-900 mb-4">My Products</h3>
+            <div class="bg-white rounded-lg shadow p-6 surface-card seller-products-shell">
+                <div class="seller-products-header mb-5">
+                    <div>
+                        <p class="section-eyebrow seller-eyebrow seller-eyebrow-soft">Catalog View</p>
+                        <h3 class="text-2xl font-bold text-gray-900">My Products</h3>
+                        <p class="text-sm text-gray-500 mt-2">A sharper command view for your live listings, stock, and fast actions.</p>
+                    </div>
+                    <div class="seller-products-pill">
+                        <span id="seller-products-total-label">0 live listings</span>
+                    </div>
+                </div>
                 <div id="seller-products" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
             </div>
         </section>
@@ -405,34 +1021,35 @@
             <h2 class="text-3xl font-bold text-gray-900 mb-6">Admin Dashboard</h2>
             
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow metric-card metric-card-blue">
                     <div class="text-3xl font-bold" id="admin-pending-requests">0</div>
                     <p class="text-sm opacity-90">Pending Requests</p>
                 </div>
-                <div class="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-lg shadow">
+                <div class="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-lg shadow metric-card metric-card-green">
                     <div class="text-3xl font-bold" id="admin-sellers-count">0</div>
                     <p class="text-sm opacity-90">Total Sellers</p>
                 </div>
-                <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-lg shadow">
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-lg shadow metric-card metric-card-purple">
                     <div class="text-3xl font-bold" id="admin-active-sellers">0</div>
                     <p class="text-sm opacity-90">Active Sellers</p>
                 </div>
-                <div class="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-6 rounded-lg shadow">
+                <div class="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-6 rounded-lg shadow metric-card metric-card-orange">
                     <div class="text-3xl font-bold" id="admin-orders-count">0</div>
                     <p class="text-sm opacity-90">Orders</p>
                 </div>
             </div>
 
             <!-- Tabs for Admin -->
-            <div class="flex gap-2 mb-6 flex-wrap">
+            <div class="flex gap-2 mb-6 flex-wrap dashboard-tabs">
                 <button onclick="switchAdminTab('category')" id="admin-category-tab" class="px-6 py-2 bg-gray-300 text-gray-900 rounded-lg font-semibold">Create Category</button>
                 <button onclick="switchAdminTab('requests')" id="admin-requests-tab" class="px-6 py-2 bg-blue-500 text-white rounded-lg font-semibold">Category Requests</button>
                 <button onclick="switchAdminTab('sellers')" id="admin-sellers-tab" class="px-6 py-2 bg-gray-300 text-gray-900 rounded-lg font-semibold">Manage Sellers</button>
                 <button onclick="switchAdminTab('orders')" id="admin-orders-tab" class="px-6 py-2 bg-gray-300 text-gray-900 rounded-lg font-semibold">Orders</button>
+                <button onclick="switchAdminTab('products')" id="admin-products-tab" class="px-6 py-2 bg-gray-300 text-gray-900 rounded-lg font-semibold">Products</button>
             </div>
 
             <!-- Create Category Tab -->
-            <div id="admin-category-tab-content" class="bg-white rounded-lg shadow p-6 mb-8 hidden">
+            <div id="admin-category-tab-content" class="bg-white rounded-lg shadow p-6 mb-8 hidden surface-card">
                 <h3 class="text-xl font-bold text-gray-900 mb-6">Create New Category</h3>
                 <form onsubmit="handleCreateCategory(event)" class="space-y-4 max-w-md">
                     <div>
@@ -448,26 +1065,80 @@
             </div>
 
             <!-- Category Requests Tab -->
-            <div id="admin-requests-tab-content" class="bg-white rounded-lg shadow p-6 mb-8">
+            <div id="admin-requests-tab-content" class="bg-white rounded-lg shadow p-6 mb-8 surface-card">
                 <h3 class="text-xl font-bold text-gray-900 mb-4">Pending Category Requests</h3>
                 <div id="admin-requests-list" class="space-y-4"></div>
             </div>
 
             <!-- Manage Sellers Tab -->
-            <div id="admin-sellers-tab-content" class="bg-white rounded-lg shadow p-6 mb-8 hidden">
+            <div id="admin-sellers-tab-content" class="bg-white rounded-lg shadow p-6 mb-8 hidden surface-card">
                 <h3 class="text-xl font-bold text-gray-900 mb-4">Sellers Management</h3>
                 <div id="admin-sellers-list" class="space-y-4"></div>
             </div>
 
             <!-- Orders Tab -->
-            <div id="admin-orders-tab-content" class="bg-white rounded-lg shadow p-6 hidden">
+            <div id="admin-orders-tab-content" class="bg-white rounded-lg shadow p-6 hidden surface-card">
                 <h3 class="text-xl font-bold text-gray-900 mb-4">Orders Management</h3>
                 <div id="admin-orders-list" class="space-y-4"></div>
+            </div>
+
+            <!-- Products Tab -->
+            <div id="admin-products-tab-content" class="bg-white rounded-lg shadow p-6 hidden surface-card">
+                <div class="flex flex-col gap-2 mb-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900">Products Catalog</h3>
+                        <p class="text-sm text-gray-500 mt-1">Admin-only marketplace view for all active products.</p>
+                    </div>
+                    <span id="admin-products-count-label" class="inline-flex px-4 py-2 rounded-full bg-blue-50 text-blue-700 text-sm font-semibold">0 products</span>
+                </div>
+                <div id="admin-products-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
             </div>
         </section>
 
     </div>
 
+    <div id="payment-otp-modal" class="app-modal hidden" aria-hidden="true">
+        <div class="app-modal-backdrop" onclick="closePaymentOtpModal()"></div>
+        <div class="app-modal-card payment-otp-card" role="dialog" aria-modal="true" aria-labelledby="payment-otp-title">
+            <div class="app-modal-icon payment-otp-icon">OTP</div>
+            <h3 id="payment-otp-title" class="text-2xl font-bold text-gray-900">Verify Your Payment</h3>
+            <p class="payment-otp-copy">Complete the final step for your online payment with the one-time password sent to your email.</p>
+
+            <div class="payment-otp-meta">
+                <span class="payment-otp-pill" id="payment-otp-order">#ORDER</span>
+                <span class="payment-otp-pill" id="payment-otp-method">Online Payment</span>
+                <span class="payment-otp-pill" id="payment-otp-expiry">10 min expiry</span>
+            </div>
+
+            <p class="payment-otp-email-label">Delivery email</p>
+            <p id="payment-otp-email" class="payment-otp-email">your registered email</p>
+            <p id="payment-otp-status" class="payment-otp-status">Enter the 6-digit OTP sent to your email.</p>
+
+            <form id="payment-otp-form" class="payment-otp-form" onsubmit="verifyPaymentOtp(event)">
+                <input
+                    id="payment-otp-input"
+                    class="payment-otp-input"
+                    type="text"
+                    inputmode="numeric"
+                    maxlength="6"
+                    autocomplete="one-time-code"
+                    placeholder="Enter 6-digit OTP"
+                    aria-label="Payment OTP"
+                >
+                <div class="payment-otp-actions">
+                    <button id="payment-otp-verify-button" type="submit" class="cart-primary-cta" data-ripple>Verify Payment</button>
+                    <button id="payment-otp-resend" type="button" class="cart-secondary-cta" onclick="resendPaymentOtp()">Resend OTP</button>
+                </div>
+            </form>
+
+            <button type="button" class="payment-otp-dismiss" onclick="closePaymentOtpModal()">Close</button>
+        </div>
+    </div>
+
     <script src="../static/js/main.js"></script>
+    <script src="../static/js/ui-enhancements.js"></script>
+    <script src="../static/js/color-extractor.js"></script>
+    <script src="../static/js/storefront.js"></script>
+    <script src="../static/js/app-experience.js"></script>
 </body>
 </html>

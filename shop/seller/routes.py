@@ -33,6 +33,45 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
 
+
+def serialize_seller_product(product):
+    primary_image = ProductImage.query.filter_by(
+        product_id=product.id,
+        is_primary=True,
+        is_active=True
+    ).first()
+
+    images = ProductImage.query.filter_by(
+        product_id=product.id,
+        is_active=True
+    ).order_by(ProductImage.created_at.asc()).all()
+
+    specifications = Specification.query.filter_by(
+        product_id=product.id,
+        is_active=True
+    ).order_by(Specification.created_at.asc()).all()
+
+    return {
+        "uuid": product.uuid,
+        "name": product.name,
+        "description": product.description,
+        "price": float(product.price),
+        "stock": product.stock,
+        "category": product.category.name,
+        "category_uuid": product.category.uuid,
+        "primary_image": primary_image.image_url if primary_image else None,
+        "images": [image.image_url for image in images],
+        "specifications": [
+            {
+                "key": spec.spec_key,
+                "value": spec.spec_value
+            }
+            for spec in specifications
+        ],
+        "created_at": product.created_at.strftime("%Y-%m-%d %H:%M:%S") if product.created_at else None,
+        "updated_at": product.updated_at.strftime("%Y-%m-%d %H:%M:%S") if product.updated_at else None,
+    }
+
 # ==============================================================================
 # 📦 PRODUCT APIs (Seller Only)
 # ==============================================================================
@@ -168,27 +207,167 @@ def create_product(current_seller):
 @seller_bp.route('/products', methods=['GET'])
 @seller_required
 def get_my_products(current_seller):
-    products = Product.query.filter_by(seller_id=current_seller.id, is_active=True).all()
-    
-    result = []
-    for prod in products:
-        # Fetch primary image if exists
-        primary_image = ProductImage.query.filter_by(product_id=prod.id, is_primary=True).first()
-        img_url = primary_image.image_url if primary_image else None
-        
-        result.append({
-            "uuid": prod.uuid,
-            "name": prod.name,
-            "price": prod.price,
-            "stock": prod.stock,
-            "category": prod.category.name,
-            "primary_image": img_url
-        })
+    products = Product.query.filter_by(
+        seller_id=current_seller.id,
+        is_active=True
+    ).order_by(Product.created_at.desc()).all()
+
+    result = [serialize_seller_product(prod) for prod in products]
         
     return jsonify({
         "total_products": len(result),
         "products": result
     }), 200
+
+
+@seller_bp.route('/product/<product_uuid>', methods=['PUT'])
+@seller_required
+def update_product(current_seller, product_uuid):
+    product = Product.query.filter_by(
+        uuid=product_uuid,
+        seller_id=current_seller.id,
+        is_active=True
+    ).first()
+
+    if not product:
+        return jsonify({"error": "Product not found"}), 404
+
+    is_form_request = request.content_type and 'multipart/form-data' in request.content_type
+    payload = request.form if is_form_request else (request.get_json() or {})
+
+    name = (payload.get('name') or product.name).strip()
+    description = (payload.get('description') or product.description).strip()
+    price = payload.get('price', product.price)
+    stock = payload.get('stock', product.stock)
+    category_uuid = payload.get('category_uuid', product.category.uuid if product.category else None)
+    specifications_data = payload.get('specifications')
+
+    if not all([name, description, category_uuid]):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    category = Category.query.filter_by(uuid=category_uuid, is_active=True).first()
+    if not category:
+        return jsonify({"error": "Invalid or inactive category"}), 404
+
+    is_approved_seller = SellerCategory.query.filter_by(
+        seller_id=current_seller.id,
+        category_id=category.id,
+        is_approved=True,
+        is_active=True
+    ).first()
+
+    if not is_approved_seller:
+        return jsonify({
+            "error": "Category Approval Required",
+            "message": f"Aap '{category.name}' category mein product nahi daal sakte. Pehle Admin se approval lijiye."
+        }), 403
+
+    image_files = request.files.getlist('images') if is_form_request else []
+    has_new_images = bool(image_files and image_files[0].filename)
+
+    try:
+        product.name = name
+        product.description = description
+        product.price = float(price)
+        product.stock = int(stock)
+        product.category_id = category.id
+        product.updated_by = current_seller.id
+
+        if specifications_data is not None:
+            for existing_spec in product.specifications:
+                if existing_spec.is_active:
+                    existing_spec.is_active = False
+                    existing_spec.updated_by = current_seller.id
+
+            parsed_specs = json.loads(specifications_data) if isinstance(specifications_data, str) else specifications_data
+            for spec in parsed_specs or []:
+                spec_key = (spec.get('key') or '').strip()
+                spec_value = (spec.get('value') or '').strip()
+                if not spec_key or not spec_value:
+                    continue
+
+                db.session.add(Specification(
+                    product_id=product.id,
+                    spec_key=spec_key,
+                    spec_value=spec_value,
+                    created_by=current_seller.id,
+                    updated_by=current_seller.id,
+                    is_active=True
+                ))
+
+        if has_new_images:
+            upload_dir = current_app.config['UPLOAD_FOLDER']
+            if not os.path.exists(upload_dir):
+                os.makedirs(upload_dir)
+
+            for existing_image in product.images:
+                if existing_image.is_active:
+                    existing_image.is_active = False
+                    existing_image.is_primary = False
+                    existing_image.updated_by = current_seller.id
+
+            for index, file in enumerate(image_files):
+                if file and allowed_file(file.filename):
+                    original_filename = secure_filename(file.filename)
+                    unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
+                    upload_path = os.path.join(upload_dir, unique_filename)
+                    file.save(upload_path)
+                    db.session.add(ProductImage(
+                        product_id=product.id,
+                        image_url=f"/static/uploads/products/{unique_filename}",
+                        is_primary=index == 0,
+                        created_by=current_seller.id,
+                        updated_by=current_seller.id,
+                        is_active=True
+                    ))
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Product updated successfully",
+            "product": serialize_seller_product(product)
+        }), 200
+
+    except json.JSONDecodeError:
+        db.session.rollback()
+        return jsonify({"error": "Invalid specifications format"}), 400
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"error": "Failed to update product", "details": str(exc)}), 500
+
+
+@seller_bp.route('/product/<product_uuid>', methods=['DELETE'])
+@seller_required
+def delete_product(current_seller, product_uuid):
+    product = Product.query.filter_by(
+        uuid=product_uuid,
+        seller_id=current_seller.id,
+        is_active=True
+    ).first()
+
+    if not product:
+        return jsonify({"error": "Product not found"}), 404
+
+    try:
+        product.is_active = False
+        product.updated_by = current_seller.id
+
+        for image in product.images:
+            image.is_active = False
+            image.updated_by = current_seller.id
+
+        for specification in product.specifications:
+            specification.is_active = False
+            specification.updated_by = current_seller.id
+
+        db.session.commit()
+
+        return jsonify({
+            "message": f"Product '{product.name}' deleted successfully."
+        }), 200
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"error": "Failed to delete product", "details": str(exc)}), 500
 
 
 
@@ -236,6 +415,7 @@ def request_category_approval(current_seller):
         # =====================================================================
         # 📧 EMAIL TO ADMIN LOGIC
         # =====================================================================
+        email_sent = False
         try:
             # 1. Pehle Admin role ki ID nikalo
             admin_role = Role.query.filter_by(role_name='admin').first()
@@ -252,6 +432,7 @@ def request_category_approval(current_seller):
                     seller_name=current_seller.username,
                     category_name=category.name
                 )
+                email_sent = True
                 print(f"Notification sent to admins: {admin_emails}")
         except Exception as mail_err:
             print(f"Admin email sending failed: {str(mail_err)}")
@@ -259,8 +440,9 @@ def request_category_approval(current_seller):
         # =====================================================================
         
         return jsonify({
-            "message": f"Request to sell in '{category.name}' submitted successfully. An email notification has been sent to the Admin.",
-            "request_uuid": new_request.uuid
+            "message": f"Request to sell in '{category.name}' submitted successfully.",
+            "request_uuid": new_request.uuid,
+            "email_status": "Admin notification email sent successfully." if email_sent else "Request saved, but admin email notification could not be sent."
         }), 201
         
     except Exception as e:
