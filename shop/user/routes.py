@@ -1315,3 +1315,120 @@ def get_user_orders(current_customer):
         })
 
     return success_response("Orders loaded successfully.", total_orders=len(result), orders=result)
+
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+# # File: shop/user/routes.py (add to your existing routes3.py)
+# from shop.utils.email_service import send_profile_otp_email
+# from shop.extensions import bcrypt
+# import random
+
+# # Temporary storage for pending updates
+# PENDING_PROFILE_UPDATES = {}
+
+# @user_bp.route('/profile/update/request-otp', methods=['POST'])
+# @jwt_required()
+# def request_profile_update_otp():
+#     user_uuid = get_jwt_identity()
+#     user = User.query.filter_by(uuid=user_uuid, is_active=True).first()
+    
+#     if not user:
+#         return error_response("User not found", status_code=404)
+
+#     data = request.get_json() or {}
+#     new_name = str(data.get('name') or '').strip()
+#     new_email = str(data.get('email') or '').strip()
+#     new_password = data.get('password')
+
+#     # Ensure there are actually changes requested
+#     if not new_name and not new_email and not new_password:
+#         return error_response("No changes requested.", status_code=400)
+
+#     # Email uniqueness check
+#     if new_email and new_email != user.email:
+#         existing_user = User.query.filter_by(email=new_email).first()
+#         if existing_user:
+#             return error_response("This email is already registered to another account.", status_code=409)
+
+#     # 1. Generate OTP using existing OTP model logic
+#     otp_code = f"{random.randint(0, 999999):06d}"
+#     otp_entry = Otp(
+#         user_id=user.id,
+#         order_id=None, # Crucial: NULL order_id indicates it's a profile action
+#         otp_code=otp_code,
+#         action=OTPAction.verification,
+#         is_used=False,
+#         expires_at=datetime.utcnow() + timedelta(minutes=10),
+#         created_by=user.id,
+#         updated_by=user.id,
+#         is_active=True
+#     )
+#     db.session.add(otp_entry)
+#     db.session.commit()
+
+#     # 2. Store pending data temporarily mapping to user.id
+#     PENDING_PROFILE_UPDATES[user.id] = {
+#         'username': new_name if new_name else None,
+#         'email': new_email if new_email and new_email != user.email else None,
+#         'password': new_password if new_password else None
+#     }
+
+#     # 3. Send OTP to CURRENT email
+#     email_sent = send_profile_otp_email(user.email, user.username, otp_code, expires_in_minutes=10)
+
+#     if not email_sent:
+#         return error_response("Failed to send OTP to your email. Try again.", status_code=500)
+
+#     return success_response("OTP sent securely to your current email.", require_otp=True)
+
+
+# @user_bp.route('/profile/update/verify-otp', methods=['POST'])
+# @jwt_required()
+# def verify_profile_update_otp():
+#     user_uuid = get_jwt_identity()
+#     user = User.query.filter_by(uuid=user_uuid, is_active=True).first()
+#     data = request.get_json() or {}
+#     otp_code = str(data.get('otp') or '').strip()
+
+#     if not otp_code:
+#         return error_response("OTP is required", status_code=400)
+
+#     # 1. Check if OTP is valid and not expired
+#     otp_entry = Otp.query.filter_by(
+#         user_id=user.id,
+#         otp_code=otp_code,
+#         action=OTPAction.verification,
+#         is_used=False,
+#         is_active=True
+#     ).order_by(Otp.created_at.desc()).first()
+
+#     if not otp_entry or otp_entry.expires_at < datetime.utcnow():
+#         return error_response("Invalid or expired OTP. Please request a new one.", status_code=400)
+
+#     # 2. Get pending updates
+#     pending_data = PENDING_PROFILE_UPDATES.get(user.id)
+#     if not pending_data:
+#         return error_response("No pending update session found. Please try again.", status_code=400)
+
+#     # 3. Apply changes securely
+#     if pending_data.get('username'):
+#         user.username = pending_data['username']
+#     if pending_data.get('email'):
+#         user.email = pending_data['email']
+#     if pending_data.get('password'):
+#         user.password = bcrypt.generate_password_hash(pending_data['password']).decode('utf-8')
+
+#     # Mark OTP as used
+#     otp_entry.is_used = True
+#     otp_entry.updated_by = user.id
+#     user.updated_by = user.id
+    
+#     db.session.commit()
+
+#     # Clear pending cache
+#     PENDING_PROFILE_UPDATES.pop(user.id, None)
+
+#     return success_response("Profile updated successfully!")

@@ -216,3 +216,40 @@ def send_payment_otp_email(customer_email, customer_name, order_uuid, otp_code, 
     except Exception as exc:
         current_app.logger.exception('Payment OTP email failed: %s', exc)
         return False
+
+
+
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+def send_profile_otp_email(customer_email, customer_name, otp_code, expires_in_minutes=10):
+    """Reuses the exact email shell to send a profile update OTP"""
+    try:
+        body = f"""
+        <p style="margin:0 0 14px;">Hi {customer_name},</p>
+        <p style="margin:0 0 20px;">We received a request to update your profile information. Enter this one-time password to verify and apply your changes.</p>
+        <div style="margin:0 0 18px; padding:22px 20px; border:1px solid #C7D2FE; border-radius:20px; background:#EEF2FF; text-align:center;">
+            <p style="margin:0 0 10px; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:#6366F1;">Your Verification Code</p>
+            <p style="margin:0; font-size:38px; line-height:1; letter-spacing:0.32em; font-weight:800; color:#111827;">{otp_code}</p>
+        </div>
+        <div style="padding:16px 18px; border:1px solid #E5E7EB; border-radius:18px; background:#F9FAFB; text-align:center;">
+            <p style="margin:0; color:#374151;">This OTP expires in <strong>{int(expires_in_minutes)}</strong> minutes. If you did not request this change, please change your password immediately.</p>
+        </div>
+        """
+
+        html_body = _email_shell(
+            eyebrow='Security Verification',
+            title='Verify Profile Update',
+            content_html=body,
+            footer_text='Pro Shop Secure Account Management',
+        )
+        _send_html_email(
+            'Pro Shop - Verify Your Profile Update',
+            [customer_email],
+            html_body,
+        )
+        return True
+    except Exception as exc:
+        current_app.logger.exception('Profile OTP email failed: %s', exc)
+        return False
